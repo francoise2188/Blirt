@@ -364,6 +364,23 @@ export default function GuestPage() {
     return audioFile ? 'Submit' : 'Record';
   }, [audioFile, countdown, isRecording, mode, submitted, videoFile]);
 
+  /** Full-screen camera layer (countdown + record) so the page doesn’t scroll/jump each second. */
+  const showVideoFullscreen = useMemo(
+    () =>
+      mode === 'video' &&
+      (isRecording || (countdown !== null && countdown > 0)),
+    [mode, isRecording, countdown],
+  );
+
+  useEffect(() => {
+    if (!showVideoFullscreen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showVideoFullscreen]);
+
   const handleBigButtonClick = async () => {
     if (submitted) return;
 
@@ -744,43 +761,14 @@ export default function GuestPage() {
         />
       </div>
 
-      <div className={styles.composer} aria-label="Composer">
+      <div
+        className={`${styles.composer} ${showVideoFullscreen ? styles.composerHidden : ''}`}
+        aria-label="Composer"
+        aria-hidden={showVideoFullscreen}
+      >
         {mode === 'video' && (
           <>
-            {isRecording || (countdown !== null && countdown > 0) ? (
-              <div className={styles.liveWrap}>
-                <div className={styles.liveVideoShell}>
-                  <video
-                    ref={liveVideoRef}
-                    className={`${styles.liveVideo} ${styles.liveVideoMirror}`}
-                    playsInline
-                    muted
-                    autoPlay
-                  />
-                  {!isRecording && countdown !== null && countdown > 0 ? (
-                    <div className={styles.countdownOverlay} aria-live="polite">
-                      <span className={styles.countdownNumber}>{countdown}</span>
-                    </div>
-                  ) : null}
-                </div>
-                <p className={styles.liveCaption}>
-                  {isRecording ? (
-                    <>
-                      Recording — tap <strong>Stop</strong> when you&apos;re finished.
-                    </>
-                  ) : (
-                    <>Starting in…</>
-                  )}
-                </p>
-                <button
-                  type="button"
-                  className={styles.cancelRecordingLink}
-                  onClick={cancelActiveVideoRecording}
-                >
-                  {isRecording ? 'Cancel recording' : 'Cancel'}
-                </button>
-              </div>
-            ) : videoPreviewUrl ? (
+            {!showVideoFullscreen && videoPreviewUrl ? (
               <>
                 <div className={styles.preview}>
                   <video
@@ -803,12 +791,13 @@ export default function GuestPage() {
                   </span>
                 </div>
               </>
-            ) : (
+            ) : null}
+            {!showVideoFullscreen && !videoPreviewUrl ? (
               <div className={styles.helpBox}>
                 Tap <strong>Record</strong> to open your camera and film here. You can retake before
                 you send.
               </div>
-            )}
+            ) : null}
           </>
         )}
 
@@ -892,28 +881,96 @@ export default function GuestPage() {
         )}
       </div>
 
-      {recordHint ? (
-        <div className={styles.recordHint} role="status">
-          {recordHint}
-        </div>
-      ) : null}
+      {showVideoFullscreen ? (
+        <>
+          <div
+            className={styles.videoFullScreenShell}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Camera"
+          >
+            <div className={styles.videoFullScreenInner}>
+              <div className={styles.liveVideoShell}>
+                <video
+                  ref={liveVideoRef}
+                  className={`${styles.liveVideo} ${styles.liveVideoMirror} ${styles.liveVideoFullscreen}`}
+                  playsInline
+                  muted
+                  autoPlay
+                />
+                {!isRecording && countdown !== null && countdown > 0 ? (
+                  <div className={styles.countdownOverlay} aria-live="polite">
+                    <span className={styles.countdownNumber}>{countdown}</span>
+                  </div>
+                ) : null}
+              </div>
+              <p className={styles.liveCaptionOnDark}>
+                {isRecording ? (
+                  <>
+                    Recording — tap <strong>Stop</strong> below when you&apos;re finished.
+                  </>
+                ) : (
+                  <>Get ready…</>
+                )}
+              </p>
+              <button
+                type="button"
+                className={styles.cancelOnDark}
+                onClick={cancelActiveVideoRecording}
+              >
+                {isRecording ? 'Cancel recording' : 'Cancel countdown'}
+              </button>
+            </div>
+          </div>
 
-      <button
-        type="button"
-        className={styles.bigCta}
-        onClick={handleBigButtonClick}
-        // Video/audio: first tap opens camera/mic — do not disable until file exists.
-        disabled={
-          isSubmitting ||
-          (mode === 'text' && !message.trim() && !submitted)
-        }
-        aria-disabled={
-          isSubmitting ||
-          (mode === 'text' && !message.trim() && !submitted)
-        }
-      >
-        {bigButtonLabel}
-      </button>
+          <div className={styles.videoStageBottomBar}>
+            {recordHint ? (
+              <div className={styles.recordHint} role="status">
+                {recordHint}
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className={styles.bigCta}
+              onClick={handleBigButtonClick}
+              disabled={
+                isSubmitting ||
+                (mode === 'text' && !message.trim() && !submitted)
+              }
+              aria-disabled={
+                isSubmitting ||
+                (mode === 'text' && !message.trim() && !submitted)
+              }
+            >
+              {bigButtonLabel}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          {recordHint ? (
+            <div className={styles.recordHint} role="status">
+              {recordHint}
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            className={styles.bigCta}
+            onClick={handleBigButtonClick}
+            disabled={
+              isSubmitting ||
+              (mode === 'text' && !message.trim() && !submitted)
+            }
+            aria-disabled={
+              isSubmitting ||
+              (mode === 'text' && !message.trim() && !submitted)
+            }
+          >
+            {bigButtonLabel}
+          </button>
+        </>
+      )}
 
       {submitted && (
         <div className={styles.success}>
