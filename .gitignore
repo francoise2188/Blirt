@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Env secrets (set these in Vercel instead)
+.env
+.env.local
+.env.*.local
+
+# Debug / OS
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# TypeScript
+next-env.d.ts
+
+# IDE
+.idea/
+.vscode/
