@@ -561,8 +561,15 @@ export default function GuestPage() {
         type="button"
         className={styles.bigCta}
         onClick={handleBigButtonClick}
-        disabled={isSubmitting || (!submitted && !canSubmit)}
-        aria-disabled={isSubmitting || (!submitted && !canSubmit)}
+        // Video/audio: first tap opens camera/mic — do not disable until file exists.
+        disabled={
+          isSubmitting ||
+          (mode === 'text' && !message.trim() && !submitted)
+        }
+        aria-disabled={
+          isSubmitting ||
+          (mode === 'text' && !message.trim() && !submitted)
+        }
       >
         {bigButtonLabel}
       </button>

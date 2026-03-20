@@ -254,6 +254,8 @@
   color: #161616;
   box-shadow: 0 12px 0 rgba(0, 0, 0, 0.08);
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.08);
   transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease,
     opacity 120ms ease;
 }
