@@ -1,10 +1,17 @@
 .page {
+  /* Avoid mobile browser chrome / keyboard making the page feel “zoomed” or stuck */
   min-height: 100vh;
-  padding: 22px 16px 18px;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  padding: 22px 16px max(22px, env(safe-area-inset-bottom));
+  padding-top: max(22px, env(safe-area-inset-top));
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
+  overscroll-behavior-y: contain;
 }
 
 .top {
@@ -178,7 +185,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 220px;
+  /* Don’t force a tall box after submit — reduces odd scroll / resize on phones */
+  min-height: min(220px, 45dvh);
 }
 
 .hiddenInput {
@@ -218,7 +226,8 @@
   border: 1px solid rgba(21, 21, 21, 0.12);
   background: rgba(250, 248, 244, 0.9);
   padding: 12px 12px;
-  font-size: 15px;
+  /* 16px+ avoids iOS auto-zooming the whole page when the keyboard opens */
+  font-size: 16px;
   line-height: 1.4;
   resize: vertical;
   min-height: 130px;
@@ -356,5 +365,134 @@
   padding: 12px 14px;
   color: rgba(21, 21, 21, 0.72);
   font-weight: 850;
+}
+
+.guestNameWrap {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.guestNameLabel {
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(21, 21, 21, 0.72);
+}
+
+.optional {
+  font-weight: 650;
+  opacity: 0.65;
+}
+
+.guestNameInput {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(21, 21, 21, 0.12);
+  background: rgba(250, 248, 244, 0.9);
+  padding: 12px 14px;
+  font-size: 16px;
+  outline: none;
+}
+
+.guestNameInput:focus {
+  border-color: rgba(181, 204, 46, 0.95);
+}
+
+.liveWrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.liveVideo {
+  width: 100%;
+  max-height: min(52vh, 480px);
+  border-radius: 14px;
+  background: #111;
+  object-fit: cover;
+}
+
+.liveCaption {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 750;
+  text-align: center;
+  color: rgba(21, 21, 21, 0.78);
+}
+
+.audioRecordingBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 16px;
+  border-radius: 14px;
+  background: rgba(181, 204, 46, 0.15);
+  border: 1px solid rgba(181, 204, 46, 0.45);
+}
+
+.recDot {
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #c62828;
+  flex-shrink: 0;
+  animation: pulseRec 1.2s ease-in-out infinite;
+}
+
+@keyframes pulseRec {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+}
+
+.audioRecordingText {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.35;
+  color: rgba(21, 21, 21, 0.88);
+}
+
+.fallbackLink {
+  align-self: center;
+  margin-top: 2px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 800;
+  color: rgba(21, 21, 21, 0.72);
+  background: transparent;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.fallbackLink:active {
+  opacity: 0.75;
+}
+
+.recordHint {
+  width: 100%;
+  max-width: 520px;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: rgba(90, 50, 0, 0.95);
+  background: rgba(255, 236, 200, 0.85);
+  border: 1px solid rgba(200, 140, 40, 0.25);
 }
 

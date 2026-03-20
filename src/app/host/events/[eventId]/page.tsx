@@ -1,12 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import QRCode from 'react-qr-code';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../../../../lib/supabaseClient';
 import { getGuestPageUrl } from '../../../../lib/guestUrl';
+import {
+  downloadPngDataUrl,
+  openQrPrintSheet,
+  svgQrToPngDataUrl,
+} from '../../../../lib/qrExport';
 import { getPromptLibraryForEventType } from '../../../../lib/promptLibrary';
 import styles from '../../host.module.css';
 
@@ -80,8 +85,14 @@ export default function HostEventManagePage() {
   const [savingPrompts, setSavingPrompts] = useState(false);
 
   const [exporting, setExporting] = useState(false);
+  const [qrBusy, setQrBusy] = useState(false);
+  const qrWrapRef = useRef<HTMLDivElement | null>(null);
 
   const guestUrl = useMemo(() => getGuestPageUrl(eventId), [eventId]);
+  const eventTitleForFiles = useMemo(
+    () => displayEventNames(event?.partner_1 ?? null, event?.partner_2 ?? null),
+    [event?.partner_1, event?.partner_2],
+  );
 
   const loadBlirts = useCallback(async () => {
     if (!supabase || !eventId) return;
@@ -196,6 +207,49 @@ export default function HostEventManagePage() {
   function toggleSelectAll() {
     if (allSelected) setSelectedIds([]);
     else setSelectedIds(blirts.map((b) => b.id));
+  }
+
+  async function downloadQrPng() {
+    const svg = qrWrapRef.current?.querySelector('svg');
+    if (!svg) {
+      window.alert('QR code is not ready yet.');
+      return;
+    }
+    setQrBusy(true);
+    try {
+      const png = await svgQrToPngDataUrl(svg, 1200);
+      const slug = eventTitleForFiles
+        .replace(/[^a-z0-9]+/gi, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 40);
+      downloadPngDataUrl(png, `blirt-qr-${slug || eventId}.png`);
+    } catch {
+      window.alert('Could not build the image. Try another browser or update your browser.');
+    } finally {
+      setQrBusy(false);
+    }
+  }
+
+  async function printQrSheet() {
+    const svg = qrWrapRef.current?.querySelector('svg');
+    if (!svg) {
+      window.alert('QR code is not ready yet.');
+      return;
+    }
+    setQrBusy(true);
+    try {
+      const png = await svgQrToPngDataUrl(svg, 1200);
+      openQrPrintSheet({
+        documentTitle: `Blirt QR — ${eventTitleForFiles}`,
+        headline: eventTitleForFiles,
+        guestUrl,
+        pngDataUrl: png,
+      });
+    } catch {
+      window.alert('Could not prepare print. Try Download QR instead.');
+    } finally {
+      setQrBusy(false);
+    }
   }
 
   async function exportCsvForBlirts(items: BlirtRow[], fileSuffix: string) {
@@ -566,11 +620,33 @@ export default function HostEventManagePage() {
 
           <div className={styles.qrBox} style={{ marginTop: 24 }}>
             <div className={styles.h2}>QR code</div>
-            <div style={{ padding: 12, background: 'white', borderRadius: 12 }}>
-              <QRCode value={guestUrl} size={200} />
+            <div
+              ref={qrWrapRef}
+              style={{ padding: 16, background: 'white', borderRadius: 12 }}
+            >
+              <QRCode value={guestUrl} size={256} />
+            </div>
+            <div className={styles.qrActions}>
+              <button
+                type="button"
+                className={`${styles.button} ${styles.buttonGhost}`}
+                onClick={() => void downloadQrPng()}
+                disabled={qrBusy}
+              >
+                {qrBusy ? 'Working…' : 'Download QR (PNG)'}
+              </button>
+              <button
+                type="button"
+                className={`${styles.button} ${styles.buttonGhost}`}
+                onClick={() => void printQrSheet()}
+                disabled={qrBusy}
+              >
+                Print QR sheet
+              </button>
             </div>
             <p className={styles.muted} style={{ margin: 0 }}>
-              Print or add to a sign. One QR per event—it always points at this link.
+              Download a high-resolution image for signs, or print a sheet with the link and QR. One
+              code per event — it always opens this guest page.
             </p>
           </div>
         </div>

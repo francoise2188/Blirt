@@ -6,6 +6,14 @@ import styles from './page.module.css';
 import { supabase } from '../../lib/supabaseClient';
 import { submitGuestMediaBlirt } from '../../lib/submitGuestBlirt';
 import { GUEST_MAX_PROMPT_SKIPS } from '../../lib/promptLibrary';
+import {
+  blobToAudioFile,
+  blobToVideoFile,
+  canUseInPageRecording,
+  startAudioRecording,
+  startVideoRecording,
+  type LiveRecording,
+} from '../../lib/guestMediaCapture';
 
 type Mode = 'video' | 'audio' | 'text';
 
@@ -72,6 +80,11 @@ export default function GuestPage() {
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
   const messageRef = useRef<HTMLTextAreaElement | null>(null);
+  const liveVideoRef = useRef<HTMLVideoElement | null>(null);
+  const liveRecordingRef = useRef<LiveRecording | null>(null);
+
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordHint, setRecordHint] = useState<string | null>(null);
 
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
@@ -214,13 +227,32 @@ export default function GuestPage() {
   }, [audioFile]);
 
   useEffect(() => {
-    // Keep it simple: when switching modes, clear the previous input.
+    // Stop any in-progress camera/mic capture when switching modes.
+    const live = liveRecordingRef.current;
+    if (live) {
+      live.abort();
+      liveRecordingRef.current = null;
+    }
+    if (liveVideoRef.current) {
+      liveVideoRef.current.srcObject = null;
+    }
+    setIsRecording(false);
+    setRecordHint(null);
+    // Clear the previous input.
     setVideoFile(null);
     setAudioFile(null);
     setMessage('');
     setGuestName('');
     setSubmitted(false);
   }, [mode]);
+
+  useEffect(() => {
+    return () => {
+      const live = liveRecordingRef.current;
+      if (live) live.abort();
+      liveRecordingRef.current = null;
+    };
+  }, []);
 
   const canSubmit = useMemo(() => {
     if (mode === 'text') return message.trim().length > 0;
@@ -231,9 +263,13 @@ export default function GuestPage() {
   const bigButtonLabel = useMemo(() => {
     if (submitted) return 'Sent!';
     if (mode === 'text') return 'Submit';
-    if (mode === 'video') return videoFile ? 'Submit' : 'Record';
+    if (mode === 'video') {
+      if (isRecording) return 'Stop';
+      return videoFile ? 'Submit' : 'Record';
+    }
+    if (isRecording) return 'Stop';
     return audioFile ? 'Submit' : 'Record';
-  }, [audioFile, mode, submitted, videoFile]);
+  }, [audioFile, isRecording, mode, submitted, videoFile]);
 
   const handleBigButtonClick = async () => {
     if (submitted) return;
@@ -279,8 +315,63 @@ export default function GuestPage() {
     }
 
     if (mode === 'video') {
+      if (isRecording) {
+        const live = liveRecordingRef.current;
+        if (!live) {
+          setIsRecording(false);
+          return;
+        }
+        try {
+          const blob = await live.stop();
+          liveRecordingRef.current = null;
+          if (liveVideoRef.current) {
+            liveVideoRef.current.srcObject = null;
+          }
+          setIsRecording(false);
+          if (blob.size < 80) {
+            setRecordHint('That clip was too short — try recording a bit longer.');
+            return;
+          }
+          setVideoFile(blobToVideoFile(blob));
+          setRecordHint(null);
+        } catch (e) {
+          liveRecordingRef.current = null;
+          if (liveVideoRef.current) {
+            liveVideoRef.current.srcObject = null;
+          }
+          setIsRecording(false);
+          setRecordHint(
+            e instanceof Error ? e.message : 'Could not finish recording. Try again.',
+          );
+        }
+        return;
+      }
       if (!videoFile) {
-        videoInputRef.current?.click();
+        if (!canUseInPageRecording()) {
+          videoInputRef.current?.click();
+          setRecordHint(
+            'Your browser will ask you to pick a video — or try Chrome / Safari on your phone.',
+          );
+          return;
+        }
+        try {
+          setRecordHint(null);
+          const live = await startVideoRecording();
+          liveRecordingRef.current = live;
+          const el = liveVideoRef.current;
+          if (el) {
+            el.srcObject = live.stream;
+            await el.play().catch(() => {});
+          }
+          setIsRecording(true);
+        } catch (e) {
+          setRecordHint(
+            e instanceof Error
+              ? e.message
+              : 'Could not use the camera. You can pick a video from your library below.',
+          );
+          videoInputRef.current?.click();
+        }
         return;
       }
       if (eventId === 'demo') {
@@ -314,8 +405,52 @@ export default function GuestPage() {
     }
 
     // audio
+    if (isRecording) {
+      const live = liveRecordingRef.current;
+      if (!live) {
+        setIsRecording(false);
+        return;
+      }
+      try {
+        const blob = await live.stop();
+        liveRecordingRef.current = null;
+        setIsRecording(false);
+        if (blob.size < 80) {
+          setRecordHint('That voice note was too short — try again.');
+          return;
+        }
+        setAudioFile(blobToAudioFile(blob));
+        setRecordHint(null);
+      } catch (e) {
+        liveRecordingRef.current = null;
+        setIsRecording(false);
+        setRecordHint(
+          e instanceof Error ? e.message : 'Could not finish recording. Try again.',
+        );
+      }
+      return;
+    }
     if (!audioFile) {
-      audioInputRef.current?.click();
+      if (!canUseInPageRecording()) {
+        audioInputRef.current?.click();
+        setRecordHint(
+          'Your browser will ask you to pick an audio file — or try Chrome / Safari on your phone.',
+        );
+        return;
+      }
+      try {
+        setRecordHint(null);
+        const live = await startAudioRecording();
+        liveRecordingRef.current = live;
+        setIsRecording(true);
+      } catch (e) {
+        setRecordHint(
+          e instanceof Error
+            ? e.message
+            : 'Could not use the microphone. You can pick a file below.',
+        );
+        audioInputRef.current?.click();
+      }
       return;
     }
     if (eventId === 'demo') {
@@ -348,6 +483,16 @@ export default function GuestPage() {
   };
 
   const handleReset = () => {
+    const live = liveRecordingRef.current;
+    if (live) {
+      live.abort();
+      liveRecordingRef.current = null;
+    }
+    if (liveVideoRef.current) {
+      liveVideoRef.current.srcObject = null;
+    }
+    setIsRecording(false);
+    setRecordHint(null);
     setMode('video');
     setVideoFile(null);
     setAudioFile(null);
@@ -493,10 +638,24 @@ export default function GuestPage() {
               onChange={(e) => {
                 const f = e.target.files?.[0] ?? null;
                 setVideoFile(f);
+                setRecordHint(null);
               }}
             />
 
-            {videoPreviewUrl ? (
+            {isRecording ? (
+              <div className={styles.liveWrap}>
+                <video
+                  ref={liveVideoRef}
+                  className={styles.liveVideo}
+                  playsInline
+                  muted
+                  autoPlay
+                />
+                <p className={styles.liveCaption}>
+                  Recording — tap <strong>Stop</strong> when you&apos;re finished.
+                </p>
+              </div>
+            ) : videoPreviewUrl ? (
               <div className={styles.preview}>
                 <video
                   src={videoPreviewUrl}
@@ -506,7 +665,19 @@ export default function GuestPage() {
                 />
               </div>
             ) : (
-              <div className={styles.helpBox}>Click the button to record.</div>
+              <>
+                <div className={styles.helpBox}>
+                  Tap <strong>Record</strong> to film with your camera. Quality matches what your
+                  phone allows (HD when supported).
+                </div>
+                <button
+                  type="button"
+                  className={styles.fallbackLink}
+                  onClick={() => videoInputRef.current?.click()}
+                >
+                  Or choose a video from your library
+                </button>
+              </>
             )}
           </>
         )}
@@ -521,15 +692,35 @@ export default function GuestPage() {
               onChange={(e) => {
                 const f = e.target.files?.[0] ?? null;
                 setAudioFile(f);
+                setRecordHint(null);
               }}
             />
 
-            {audioPreviewUrl ? (
+            {isRecording ? (
+              <div className={styles.audioRecordingBox} role="status">
+                <span className={styles.recDot} aria-hidden />
+                <p className={styles.audioRecordingText}>
+                  Recording your voice — tap <strong>Stop</strong> when you&apos;re done.
+                </p>
+              </div>
+            ) : audioPreviewUrl ? (
               <div className={styles.preview}>
                 <audio src={audioPreviewUrl} controls className={styles.previewMedia} />
               </div>
             ) : (
-              <div className={styles.helpBox}>Click the button to record.</div>
+              <>
+                <div className={styles.helpBox}>
+                  Tap <strong>Record</strong> to use your microphone for a voice note (not the photo
+                  library).
+                </div>
+                <button
+                  type="button"
+                  className={styles.fallbackLink}
+                  onClick={() => audioInputRef.current?.click()}
+                >
+                  Or pick an audio file from your library
+                </button>
+              </>
             )}
           </>
         )}
@@ -556,6 +747,12 @@ export default function GuestPage() {
           </>
         )}
       </div>
+
+      {recordHint ? (
+        <div className={styles.recordHint} role="status">
+          {recordHint}
+        </div>
+      ) : null}
 
       <button
         type="button"

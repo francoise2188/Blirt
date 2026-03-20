@@ -328,6 +328,13 @@
   gap: 12px;
 }
 
+.qrActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
 .urlMono {
   font-family: ui-monospace, monospace;
   font-size: 12px;
