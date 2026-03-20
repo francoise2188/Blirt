@@ -12,6 +12,7 @@ import {
   openQrPrintSheet,
   svgQrToPngDataUrl,
 } from '../../../../lib/qrExport';
+import { buildBlirtsZip } from '../../../../lib/exportBlirtsZip';
 import { getPromptLibraryForEventType } from '../../../../lib/promptLibrary';
 import styles from '../../host.module.css';
 
@@ -85,6 +86,7 @@ export default function HostEventManagePage() {
   const [savingPrompts, setSavingPrompts] = useState(false);
 
   const [exporting, setExporting] = useState(false);
+  const [zipExporting, setZipExporting] = useState(false);
   const [qrBusy, setQrBusy] = useState(false);
   const qrWrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -261,15 +263,26 @@ export default function HostEventManagePage() {
     setExporting(true);
     try {
       const rows = [
-        ['id', 'type', 'guest_name', 'status', 'created_at', 'text_or_path', 'signed_media_url'],
+        [
+          'id',
+          'type',
+          'guest_name',
+          'status',
+          'created_at',
+          'message_text_or_storage_path',
+          'media_download_link_24h',
+          'link_error_if_any',
+        ],
       ];
       for (const b of items) {
         const t = (b.type || '').toLowerCase();
         let signed = '';
+        let linkErr = '';
         if ((t === 'video' || t === 'audio') && b.content.includes('/')) {
-          const { data } = await supabase.storage
+          const { data, error } = await supabase.storage
             .from('blirts-media')
             .createSignedUrl(b.content, 86400);
+          if (error) linkErr = error.message;
           signed = data?.signedUrl ?? '';
         }
         rows.push([
@@ -280,9 +293,11 @@ export default function HostEventManagePage() {
           b.created_at ?? '',
           b.content,
           signed,
+          linkErr,
         ]);
       }
-      const csv = rows.map((r) => r.map((c) => escapeCsv(String(c))).join(',')).join('\n');
+      const csvBody = rows.map((r) => r.map((c) => escapeCsv(String(c))).join(',')).join('\n');
+      const csv = `\ufeff${csvBody}`;
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -301,6 +316,41 @@ export default function HostEventManagePage() {
   async function exportCsvSelected() {
     const items = blirts.filter((b) => selectedIds.includes(b.id));
     await exportCsvForBlirts(items, '-selected');
+  }
+
+  async function exportZipForBlirts(items: BlirtRow[], fileSuffix: string) {
+    if (!supabase) return;
+    if (!items.length) {
+      window.alert('Nothing to export.');
+      return;
+    }
+    setZipExporting(true);
+    try {
+      const { blob, skipped } = await buildBlirtsZip({ supabase, items, eventId });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `blirts-media-${eventId.slice(0, 8)}${fileSuffix}.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      if (skipped.length) {
+        window.alert(
+          `ZIP created. Some files could not be downloaded (${skipped.length}). Check any MISSING-*.txt files inside the ZIP.`,
+        );
+      }
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Could not build ZIP.');
+    } finally {
+      setZipExporting(false);
+    }
+  }
+
+  async function exportZipAll() {
+    await exportZipForBlirts(blirts, '-all');
+  }
+
+  async function exportZipSelected() {
+    const items = blirts.filter((b) => selectedIds.includes(b.id));
+    await exportZipForBlirts(items, '-selected');
   }
 
   async function savePrompts() {
@@ -423,12 +473,16 @@ export default function HostEventManagePage() {
           <p className={styles.muted} style={{ marginBottom: 12 }}>
             Click a row to open and view. Use checkboxes to export only what you select, or export everything.
           </p>
+          <p className={styles.muted} style={{ marginBottom: 12, fontSize: 13, lineHeight: 1.45 }}>
+            <strong>CSV</strong> = spreadsheet with text plus <strong>clickable links</strong> to video/audio (not the video files themselves).{' '}
+            <strong>ZIP</strong> = downloads the actual video, voice, and text files.
+          </p>
           <div className={styles.exportRow}>
             <button
               type="button"
               className={`${styles.button} ${styles.buttonGhost}`}
               onClick={() => exportCsvAll()}
-              disabled={exporting || blirts.length === 0}
+              disabled={exporting || zipExporting || blirts.length === 0}
             >
               {exporting ? 'Exporting…' : 'Export all (CSV)'}
             </button>
@@ -436,9 +490,25 @@ export default function HostEventManagePage() {
               type="button"
               className={`${styles.button} ${styles.buttonGhost}`}
               onClick={() => exportCsvSelected()}
-              disabled={exporting || selectedIds.length === 0}
+              disabled={exporting || zipExporting || selectedIds.length === 0}
             >
-              {exporting ? 'Exporting…' : `Export selected (${selectedIds.length})`}
+              {exporting ? 'Exporting…' : `Export selected (${selectedIds.length}) CSV`}
+            </button>
+            <button
+              type="button"
+              className={`${styles.button} ${styles.buttonGhost}`}
+              onClick={() => exportZipAll()}
+              disabled={zipExporting || exporting || blirts.length === 0}
+            >
+              {zipExporting ? 'Building ZIP…' : 'Download all (ZIP)'}
+            </button>
+            <button
+              type="button"
+              className={`${styles.button} ${styles.buttonGhost}`}
+              onClick={() => exportZipSelected()}
+              disabled={zipExporting || exporting || selectedIds.length === 0}
+            >
+              {zipExporting ? 'Building ZIP…' : `Download selected (${selectedIds.length}) ZIP`}
             </button>
           </div>
           {blirts.length > 0 && (

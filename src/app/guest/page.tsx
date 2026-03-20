@@ -7,11 +7,13 @@ import { supabase } from '../../lib/supabaseClient';
 import { submitGuestMediaBlirt } from '../../lib/submitGuestBlirt';
 import { GUEST_MAX_PROMPT_SKIPS } from '../../lib/promptLibrary';
 import {
+  AUDIO_CONSTRAINTS,
   blobToAudioFile,
   blobToVideoFile,
   canUseInPageRecording,
-  startAudioRecording,
-  startVideoRecording,
+  startAudioRecordingFromStream,
+  startVideoRecordingFromStream,
+  VIDEO_CONSTRAINTS,
   type LiveRecording,
 } from '../../lib/guestMediaCapture';
 
@@ -81,8 +83,14 @@ export default function GuestPage() {
   const messageRef = useRef<HTMLTextAreaElement | null>(null);
   const liveVideoRef = useRef<HTMLVideoElement | null>(null);
   const liveRecordingRef = useRef<LiveRecording | null>(null);
+  const countdownStreamRef = useRef<MediaStream | null>(null);
+  const countdownModeRef = useRef<'video' | 'audio' | null>(null);
+  /** Avoid React Strict Mode double-firing the "countdown hit 0" effect. */
+  const countdownZeroHandledRef = useRef(false);
 
   const [isRecording, setIsRecording] = useState(false);
+  /** 3 → 2 → 1 → 0 (then recording starts). null = not counting. */
+  const [countdown, setCountdown] = useState<number | null>(null);
   /** Camera stream for live preview — must attach after <video> mounts (fixes black box). */
   const [liveStreamForPreview, setLiveStreamForPreview] = useState<MediaStream | null>(null);
   const [recordHint, setRecordHint] = useState<string | null>(null);
@@ -100,6 +108,19 @@ export default function GuestPage() {
   const skipsLeft = GUEST_MAX_PROMPT_SKIPS - skipCount;
   const canSwapPrompt =
     eventId !== 'demo' && promptTemplates.length > 1 && skipCount < GUEST_MAX_PROMPT_SKIPS;
+
+  function cancelCountdown() {
+    if (countdownStreamRef.current) {
+      countdownStreamRef.current.getTracks().forEach((t) => t.stop());
+      countdownStreamRef.current = null;
+    }
+    countdownModeRef.current = null;
+    setCountdown(null);
+    setLiveStreamForPreview(null);
+    if (liveVideoRef.current) {
+      liveVideoRef.current.srcObject = null;
+    }
+  }
 
   useEffect(() => {
     if (eventId !== 'demo') return;
@@ -229,6 +250,12 @@ export default function GuestPage() {
 
   useEffect(() => {
     // Stop any in-progress camera/mic capture when switching modes.
+    if (countdownStreamRef.current) {
+      countdownStreamRef.current.getTracks().forEach((t) => t.stop());
+      countdownStreamRef.current = null;
+    }
+    countdownModeRef.current = null;
+    setCountdown(null);
     const live = liveRecordingRef.current;
     if (live) {
       live.abort();
@@ -256,9 +283,12 @@ export default function GuestPage() {
     };
   }, []);
 
-  /** Attach camera stream after <video> is in the DOM — ref was null when we only set state after getUserMedia (black preview). */
+  /** Live camera preview while counting down or recording. */
   useLayoutEffect(() => {
-    if (!liveStreamForPreview || !isRecording) return;
+    if (!liveStreamForPreview) return;
+    const needPreview =
+      isRecording || (countdown !== null && countdown > 0);
+    if (!needPreview) return;
     const el = liveVideoRef.current;
     if (!el) return;
     el.srcObject = liveStreamForPreview;
@@ -270,7 +300,51 @@ export default function GuestPage() {
     play();
     const t = window.setTimeout(play, 80);
     return () => clearTimeout(t);
-  }, [liveStreamForPreview, isRecording]);
+  }, [liveStreamForPreview, isRecording, countdown]);
+
+  /** 3 → 2 → 1, then 0 triggers recording start. */
+  useEffect(() => {
+    if (countdown === null || countdown <= 0) return;
+    const t = window.setTimeout(() => {
+      setCountdown((c) => (c === null || c <= 1 ? 0 : c - 1));
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
+
+  /** After "1", start MediaRecorder on the stream we already opened. */
+  useEffect(() => {
+    if (countdown !== 0) {
+      countdownZeroHandledRef.current = false;
+      return;
+    }
+    if (countdownZeroHandledRef.current) return;
+    countdownZeroHandledRef.current = true;
+    const stream = countdownStreamRef.current;
+    countdownStreamRef.current = null;
+    const kind = countdownModeRef.current;
+    countdownModeRef.current = null;
+    if (!stream) {
+      setCountdown(null);
+      return;
+    }
+    if (kind === 'video') {
+      const live = startVideoRecordingFromStream(stream);
+      liveRecordingRef.current = live;
+      setIsRecording(true);
+      setLiveStreamForPreview(stream);
+      setCountdown(null);
+      return;
+    }
+    if (kind === 'audio') {
+      const live = startAudioRecordingFromStream(stream);
+      liveRecordingRef.current = live;
+      setIsRecording(true);
+      setCountdown(null);
+      return;
+    }
+    stream.getTracks().forEach((tr) => tr.stop());
+    setCountdown(null);
+  }, [countdown]);
 
   const canSubmit = useMemo(() => {
     if (mode === 'text') return message.trim().length > 0;
@@ -281,18 +355,24 @@ export default function GuestPage() {
   const bigButtonLabel = useMemo(() => {
     if (submitted) return 'Sent!';
     if (mode === 'text') return 'Submit';
+    if (countdown !== null) return 'Cancel';
     if (mode === 'video') {
       if (isRecording) return 'Stop';
       return videoFile ? 'Submit' : 'Record';
     }
     if (isRecording) return 'Stop';
     return audioFile ? 'Submit' : 'Record';
-  }, [audioFile, isRecording, mode, submitted, videoFile]);
+  }, [audioFile, countdown, isRecording, mode, submitted, videoFile]);
 
   const handleBigButtonClick = async () => {
     if (submitted) return;
 
     if (isSubmitting) return;
+
+    if (countdown !== null) {
+      cancelCountdown();
+      return;
+    }
 
     if (mode === 'text') {
       if (!canSubmit) return;
@@ -375,10 +455,11 @@ export default function GuestPage() {
         }
         try {
           setRecordHint(null);
-          const live = await startVideoRecording();
-          liveRecordingRef.current = live;
-          setLiveStreamForPreview(live.stream);
-          setIsRecording(true);
+          const stream = await navigator.mediaDevices.getUserMedia(VIDEO_CONSTRAINTS);
+          countdownStreamRef.current = stream;
+          countdownModeRef.current = 'video';
+          setLiveStreamForPreview(stream);
+          setCountdown(3);
         } catch (e) {
           setRecordHint(
             e instanceof Error
@@ -454,9 +535,10 @@ export default function GuestPage() {
       }
       try {
         setRecordHint(null);
-        const live = await startAudioRecording();
-        liveRecordingRef.current = live;
-        setIsRecording(true);
+        const stream = await navigator.mediaDevices.getUserMedia(AUDIO_CONSTRAINTS);
+        countdownStreamRef.current = stream;
+        countdownModeRef.current = 'audio';
+        setCountdown(3);
       } catch (e) {
         setRecordHint(
           e instanceof Error
@@ -497,6 +579,7 @@ export default function GuestPage() {
   };
 
   const cancelActiveVideoRecording = () => {
+    cancelCountdown();
     const live = liveRecordingRef.current;
     if (live) {
       live.abort();
@@ -516,6 +599,7 @@ export default function GuestPage() {
   };
 
   const handleReset = () => {
+    cancelCountdown();
     const live = liveRecordingRef.current;
     if (live) {
       live.abort();
@@ -663,24 +747,37 @@ export default function GuestPage() {
       <div className={styles.composer} aria-label="Composer">
         {mode === 'video' && (
           <>
-            {isRecording ? (
+            {isRecording || (countdown !== null && countdown > 0) ? (
               <div className={styles.liveWrap}>
-                <video
-                  ref={liveVideoRef}
-                  className={`${styles.liveVideo} ${styles.liveVideoMirror}`}
-                  playsInline
-                  muted
-                  autoPlay
-                />
+                <div className={styles.liveVideoShell}>
+                  <video
+                    ref={liveVideoRef}
+                    className={`${styles.liveVideo} ${styles.liveVideoMirror}`}
+                    playsInline
+                    muted
+                    autoPlay
+                  />
+                  {!isRecording && countdown !== null && countdown > 0 ? (
+                    <div className={styles.countdownOverlay} aria-live="polite">
+                      <span className={styles.countdownNumber}>{countdown}</span>
+                    </div>
+                  ) : null}
+                </div>
                 <p className={styles.liveCaption}>
-                  Recording — tap <strong>Stop</strong> when you&apos;re finished.
+                  {isRecording ? (
+                    <>
+                      Recording — tap <strong>Stop</strong> when you&apos;re finished.
+                    </>
+                  ) : (
+                    <>Starting in…</>
+                  )}
                 </p>
                 <button
                   type="button"
                   className={styles.cancelRecordingLink}
                   onClick={cancelActiveVideoRecording}
                 >
-                  Cancel recording
+                  {isRecording ? 'Cancel recording' : 'Cancel'}
                 </button>
               </div>
             ) : videoPreviewUrl ? (
@@ -729,7 +826,21 @@ export default function GuestPage() {
               }}
             />
 
-            {isRecording ? (
+            {countdown !== null && countdown > 0 && !isRecording ? (
+              <div className={styles.countdownAudioBox} role="status" aria-live="polite">
+                <div className={styles.countdownNumber}>{countdown}</div>
+                <p className={styles.countdownAudioHint}>
+                  Voice note starts right after — get ready.
+                </p>
+                <button
+                  type="button"
+                  className={styles.cancelRecordingLink}
+                  onClick={cancelCountdown}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : isRecording ? (
               <div className={styles.audioRecordingBox} role="status">
                 <span className={styles.recDot} aria-hidden />
                 <p className={styles.audioRecordingText}>

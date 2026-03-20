@@ -408,6 +408,13 @@
   align-items: center;
 }
 
+.liveVideoShell {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
 .liveVideo {
   width: 100%;
   min-height: 200px;
@@ -420,6 +427,44 @@
 /* Mirror selfie preview so it feels like a phone camera (recording file is unchanged). */
 .liveVideoMirror {
   transform: scaleX(-1);
+}
+
+.countdownOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.countdownNumber {
+  font-size: clamp(72px, 22vw, 120px);
+  font-weight: 950;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  font-variant-numeric: tabular-nums;
+}
+
+.countdownAudioBox {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 16px;
+  border-radius: 14px;
+  background: rgba(181, 204, 46, 0.12);
+  border: 1px dashed rgba(21, 21, 21, 0.2);
+}
+
+.countdownAudioHint {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 750;
+  text-align: center;
+  color: rgba(21, 21, 21, 0.78);
 }
 
 .liveCaption {

@@ -170,6 +170,16 @@ function createRecorderSession(stream: MediaStream, kind: 'video' | 'audio'): Li
   return { stream, stop, abort };
 }
 
+/** Start recording on a stream you already opened (e.g. after a countdown). */
+export function startVideoRecordingFromStream(stream: MediaStream): LiveRecording {
+  return createRecorderSession(stream, 'video');
+}
+
+/** Start recording on a mic stream you already opened (e.g. after a countdown). */
+export function startAudioRecordingFromStream(stream: MediaStream): LiveRecording {
+  return createRecorderSession(stream, 'audio');
+}
+
 export async function startVideoRecording(): Promise<LiveRecording> {
   const stream = await navigator.mediaDevices.getUserMedia(VIDEO_CONSTRAINTS);
   try {
