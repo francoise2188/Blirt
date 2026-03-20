@@ -410,10 +410,16 @@
 
 .liveVideo {
   width: 100%;
+  min-height: 200px;
   max-height: min(52vh, 480px);
   border-radius: 14px;
   background: #111;
   object-fit: cover;
+}
+
+/* Mirror selfie preview so it feels like a phone camera (recording file is unchanged). */
+.liveVideoMirror {
+  transform: scaleX(-1);
 }
 
 .liveCaption {
@@ -422,6 +428,52 @@
   font-weight: 750;
   text-align: center;
   color: rgba(21, 21, 21, 0.78);
+}
+
+.cancelRecordingLink {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 750;
+  color: rgba(110, 0, 0, 0.85);
+  background: transparent;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.retakeRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  width: 100%;
+}
+
+.retakeButton {
+  width: 100%;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-weight: 900;
+  font-size: 15px;
+  cursor: pointer;
+  border: 1px solid rgba(21, 21, 21, 0.2);
+  background: rgba(255, 255, 255, 0.75);
+  color: rgba(21, 21, 21, 0.88);
+  touch-action: manipulation;
+}
+
+.retakeButton:active {
+  transform: scale(0.99);
+}
+
+.retakeHint {
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(21, 21, 21, 0.58);
+  text-align: center;
 }
 
 .audioRecordingBox {

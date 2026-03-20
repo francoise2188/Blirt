@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import styles from './page.module.css';
 import { supabase } from '../../lib/supabaseClient';
@@ -77,13 +77,14 @@ export default function GuestPage() {
   const [guestName, setGuestName] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
-  const videoInputRef = useRef<HTMLInputElement | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
   const messageRef = useRef<HTMLTextAreaElement | null>(null);
   const liveVideoRef = useRef<HTMLVideoElement | null>(null);
   const liveRecordingRef = useRef<LiveRecording | null>(null);
 
   const [isRecording, setIsRecording] = useState(false);
+  /** Camera stream for live preview — must attach after <video> mounts (fixes black box). */
+  const [liveStreamForPreview, setLiveStreamForPreview] = useState<MediaStream | null>(null);
   const [recordHint, setRecordHint] = useState<string | null>(null);
 
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
@@ -237,6 +238,7 @@ export default function GuestPage() {
       liveVideoRef.current.srcObject = null;
     }
     setIsRecording(false);
+    setLiveStreamForPreview(null);
     setRecordHint(null);
     // Clear the previous input.
     setVideoFile(null);
@@ -253,6 +255,22 @@ export default function GuestPage() {
       liveRecordingRef.current = null;
     };
   }, []);
+
+  /** Attach camera stream after <video> is in the DOM — ref was null when we only set state after getUserMedia (black preview). */
+  useLayoutEffect(() => {
+    if (!liveStreamForPreview || !isRecording) return;
+    const el = liveVideoRef.current;
+    if (!el) return;
+    el.srcObject = liveStreamForPreview;
+    el.muted = true;
+    el.defaultMuted = true;
+    el.setAttribute('playsinline', '');
+    el.setAttribute('webkit-playsinline', '');
+    const play = () => void el.play().catch(() => {});
+    play();
+    const t = window.setTimeout(play, 80);
+    return () => clearTimeout(t);
+  }, [liveStreamForPreview, isRecording]);
 
   const canSubmit = useMemo(() => {
     if (mode === 'text') return message.trim().length > 0;
@@ -324,6 +342,7 @@ export default function GuestPage() {
         try {
           const blob = await live.stop();
           liveRecordingRef.current = null;
+          setLiveStreamForPreview(null);
           if (liveVideoRef.current) {
             liveVideoRef.current.srcObject = null;
           }
@@ -336,6 +355,7 @@ export default function GuestPage() {
           setRecordHint(null);
         } catch (e) {
           liveRecordingRef.current = null;
+          setLiveStreamForPreview(null);
           if (liveVideoRef.current) {
             liveVideoRef.current.srcObject = null;
           }
@@ -348,9 +368,8 @@ export default function GuestPage() {
       }
       if (!videoFile) {
         if (!canUseInPageRecording()) {
-          videoInputRef.current?.click();
           setRecordHint(
-            'Your browser will ask you to pick a video — or try Chrome / Safari on your phone.',
+            'Recording in the browser isn’t supported here. Please open this page in Safari or Chrome on your phone.',
           );
           return;
         }
@@ -358,19 +377,14 @@ export default function GuestPage() {
           setRecordHint(null);
           const live = await startVideoRecording();
           liveRecordingRef.current = live;
-          const el = liveVideoRef.current;
-          if (el) {
-            el.srcObject = live.stream;
-            await el.play().catch(() => {});
-          }
+          setLiveStreamForPreview(live.stream);
           setIsRecording(true);
         } catch (e) {
           setRecordHint(
             e instanceof Error
               ? e.message
-              : 'Could not use the camera. You can pick a video from your library below.',
+              : 'Could not use the camera. Check permissions and try again.',
           );
-          videoInputRef.current?.click();
         }
         return;
       }
@@ -482,6 +496,25 @@ export default function GuestPage() {
     }
   };
 
+  const cancelActiveVideoRecording = () => {
+    const live = liveRecordingRef.current;
+    if (live) {
+      live.abort();
+      liveRecordingRef.current = null;
+    }
+    if (liveVideoRef.current) {
+      liveVideoRef.current.srcObject = null;
+    }
+    setLiveStreamForPreview(null);
+    setIsRecording(false);
+    setRecordHint(null);
+  };
+
+  const discardVideoClip = () => {
+    cancelActiveVideoRecording();
+    setVideoFile(null);
+  };
+
   const handleReset = () => {
     const live = liveRecordingRef.current;
     if (live) {
@@ -492,6 +525,7 @@ export default function GuestPage() {
       liveVideoRef.current.srcObject = null;
     }
     setIsRecording(false);
+    setLiveStreamForPreview(null);
     setRecordHint(null);
     setMode('video');
     setVideoFile(null);
@@ -629,24 +663,11 @@ export default function GuestPage() {
       <div className={styles.composer} aria-label="Composer">
         {mode === 'video' && (
           <>
-            <input
-              ref={videoInputRef}
-              className={styles.hiddenInput}
-              type="file"
-              accept="video/*"
-              capture="user"
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
-                setVideoFile(f);
-                setRecordHint(null);
-              }}
-            />
-
             {isRecording ? (
               <div className={styles.liveWrap}>
                 <video
                   ref={liveVideoRef}
-                  className={styles.liveVideo}
+                  className={`${styles.liveVideo} ${styles.liveVideoMirror}`}
                   playsInline
                   muted
                   autoPlay
@@ -654,30 +675,42 @@ export default function GuestPage() {
                 <p className={styles.liveCaption}>
                   Recording — tap <strong>Stop</strong> when you&apos;re finished.
                 </p>
-              </div>
-            ) : videoPreviewUrl ? (
-              <div className={styles.preview}>
-                <video
-                  src={videoPreviewUrl}
-                  controls
-                  playsInline
-                  className={styles.previewMedia}
-                />
-              </div>
-            ) : (
-              <>
-                <div className={styles.helpBox}>
-                  Tap <strong>Record</strong> to film with your camera. Quality matches what your
-                  phone allows (HD when supported).
-                </div>
                 <button
                   type="button"
-                  className={styles.fallbackLink}
-                  onClick={() => videoInputRef.current?.click()}
+                  className={styles.cancelRecordingLink}
+                  onClick={cancelActiveVideoRecording}
                 >
-                  Or choose a video from your library
+                  Cancel recording
                 </button>
+              </div>
+            ) : videoPreviewUrl ? (
+              <>
+                <div className={styles.preview}>
+                  <video
+                    src={videoPreviewUrl}
+                    controls
+                    playsInline
+                    className={styles.previewMedia}
+                  />
+                </div>
+                <div className={styles.retakeRow}>
+                  <button
+                    type="button"
+                    className={styles.retakeButton}
+                    onClick={discardVideoClip}
+                  >
+                    Retake / delete
+                  </button>
+                  <span className={styles.retakeHint}>
+                    Not happy? Record again. When you&apos;re ready, tap Submit below.
+                  </span>
+                </div>
               </>
+            ) : (
+              <div className={styles.helpBox}>
+                Tap <strong>Record</strong> to open your camera and film here. You can retake before
+                you send.
+              </div>
             )}
           </>
         )}
