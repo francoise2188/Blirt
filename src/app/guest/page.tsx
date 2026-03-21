@@ -842,8 +842,13 @@ export default function GuestPage() {
             ) : null}
             {!showVideoFullscreen && !videoPreviewUrl ? (
               <div className={styles.helpBox}>
-                Tap <strong>Record</strong> to open your camera and film here (up to {MAX_RECORDING_SECONDS}{' '}
-                seconds). You can retake before you send.
+                <p className={styles.helpBoxLead}>
+                  Tap <strong>Record</strong> (up to {MAX_RECORDING_SECONDS} seconds).
+                </p>
+                <p className={styles.helpBoxSub}>
+                  If recording won&apos;t start, open <strong>Settings</strong> → <strong>Safari</strong> or{' '}
+                  <strong>Chrome</strong> → allow Camera and Microphone for this browser.
+                </p>
               </div>
             ) : null}
           </>
@@ -987,7 +992,10 @@ export default function GuestPage() {
                     {MAX_RECORDING_SECONDS}s.
                   </>
                 ) : (
-                  <>Get ready…</>
+                  <>
+                    Get ready… Allow <strong>Camera</strong> and <strong>Microphone</strong> when your phone
+                    asks.
+                  </>
                 )}
               </p>
               <button

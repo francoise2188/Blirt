@@ -151,31 +151,27 @@ function supportedMime(candidates: string[]): string {
   return '';
 }
 
-/** Safari / iOS records reliably with MP4; WebM often fails or is unsupported for encoding. */
-function isIOSDevice(): boolean {
+/** Phones / tablets — skip aggressive bitrates; many devices choke on 8 Mbps WebM. */
+function isMobileLike(): boolean {
   if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
   return (
-    /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   );
 }
 
+/**
+ * Prefer MP4 (H.264) first on all devices — iOS and many Android browsers encode WebM poorly or not at all.
+ */
 export function pickVideoMimeType(): string {
-  const webmFirst = [
-    'video/webm;codecs=vp9,opus',
-    'video/webm;codecs=vp8,opus',
-    'video/webm',
-    'video/mp4',
-    'video/mp4;codecs=avc1',
-  ];
-  const mp4First = [
+  return supportedMime([
     'video/mp4',
     'video/mp4;codecs=avc1',
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
     'video/webm',
-  ];
-  return supportedMime(isIOSDevice() ? mp4First : webmFirst);
+  ]);
 }
 
 export function pickAudioMimeType(): string {
@@ -200,7 +196,7 @@ export function canUseInPageRecording(): boolean {
 
 /** Single guest-facing line when video recording can’t start or finish (any technical cause). */
 export const CAMERA_BLOCKED_MESSAGE =
-  'Permission blocked — Allow in the prompt; fix camera Settings for Safari/Chrome; avoid in-app browsers; open in Safari/Chrome.';
+  'Permission blocked — Allow Camera and Microphone in the prompt; in Settings allow both for Safari/Chrome; avoid in-app browsers; open in Safari/Chrome.';
 
 export function cameraFailureMessage(): string {
   return CAMERA_BLOCKED_MESSAGE;
@@ -237,13 +233,15 @@ function createRecorderSession(stream: MediaStream, kind: 'video' | 'audio'): Li
   const opts: MediaRecorderOptions = {};
   if (mime) opts.mimeType = mime;
   if (kind === 'video') {
-    // iOS Safari often rejects very high video bitrates; let defaults work if omitted.
-    if (!isIOSDevice()) {
+    // Desktop: fixed bitrate. Mobile: omit — browser defaults are more compatible (iOS + Android).
+    if (!isMobileLike()) {
       opts.videoBitsPerSecond = 8_000_000;
     }
-    opts.audioBitsPerSecond = 128_000;
+    if (!isMobileLike()) {
+      opts.audioBitsPerSecond = 128_000;
+    }
   } else {
-    opts.audioBitsPerSecond = 128_000;
+    opts.audioBitsPerSecond = isMobileLike() ? 96_000 : 128_000;
   }
 
   let recorder: MediaRecorder;
@@ -253,9 +251,13 @@ function createRecorderSession(stream: MediaStream, kind: 'video' | 'audio'): Li
     try {
       const fallback: MediaRecorderOptions = mime ? { mimeType: mime } : {};
       recorder = new MediaRecorder(stream, fallback);
-    } catch (e2) {
-      stream.getTracks().forEach((t) => t.stop());
-      throw e2 instanceof Error ? e2 : new Error('MediaRecorder not supported');
+    } catch {
+      try {
+        recorder = new MediaRecorder(stream);
+      } catch (e3) {
+        stream.getTracks().forEach((t) => t.stop());
+        throw e3 instanceof Error ? e3 : new Error('MediaRecorder not supported');
+      }
     }
   }
 
