@@ -342,18 +342,36 @@ export default function GuestPage() {
       return;
     }
     if (kind === 'video') {
-      const live = startVideoRecordingFromStream(stream);
-      liveRecordingRef.current = live;
-      setIsRecording(true);
-      setLiveStreamForPreview(stream);
-      setCountdown(null);
+      try {
+        const live = startVideoRecordingFromStream(stream);
+        liveRecordingRef.current = live;
+        setIsRecording(true);
+        setLiveStreamForPreview(stream);
+        setCountdown(null);
+      } catch {
+        stream.getTracks().forEach((tr) => tr.stop());
+        if (liveVideoRef.current) liveVideoRef.current.srcObject = null;
+        setLiveStreamForPreview(null);
+        setIsRecording(false);
+        setCountdown(null);
+        setRecordHint(cameraFailureMessage());
+      }
       return;
     }
     if (kind === 'audio') {
-      const live = startAudioRecordingFromStream(stream);
-      liveRecordingRef.current = live;
-      setIsRecording(true);
-      setCountdown(null);
+      try {
+        const live = startAudioRecordingFromStream(stream);
+        liveRecordingRef.current = live;
+        setIsRecording(true);
+        setCountdown(null);
+      } catch {
+        stream.getTracks().forEach((tr) => tr.stop());
+        setIsRecording(false);
+        setCountdown(null);
+        setRecordHint(
+          'Could not start voice recording in this browser. Try Safari or Chrome, or use “pick an audio file”.',
+        );
+      }
       return;
     }
     stream.getTracks().forEach((tr) => tr.stop());

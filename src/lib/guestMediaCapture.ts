@@ -151,14 +151,31 @@ function supportedMime(candidates: string[]): string {
   return '';
 }
 
+/** Safari / iOS records reliably with MP4; WebM often fails or is unsupported for encoding. */
+function isIOSDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
 export function pickVideoMimeType(): string {
-  return supportedMime([
+  const webmFirst = [
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
     'video/webm',
     'video/mp4',
     'video/mp4;codecs=avc1',
-  ]);
+  ];
+  const mp4First = [
+    'video/mp4',
+    'video/mp4;codecs=avc1',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+  ];
+  return supportedMime(isIOSDevice() ? mp4First : webmFirst);
 }
 
 export function pickAudioMimeType(): string {
@@ -220,7 +237,10 @@ function createRecorderSession(stream: MediaStream, kind: 'video' | 'audio'): Li
   const opts: MediaRecorderOptions = {};
   if (mime) opts.mimeType = mime;
   if (kind === 'video') {
-    opts.videoBitsPerSecond = 8_000_000;
+    // iOS Safari often rejects very high video bitrates; let defaults work if omitted.
+    if (!isIOSDevice()) {
+      opts.videoBitsPerSecond = 8_000_000;
+    }
     opts.audioBitsPerSecond = 128_000;
   } else {
     opts.audioBitsPerSecond = 128_000;

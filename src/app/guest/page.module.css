@@ -446,15 +446,16 @@
   object-fit: cover;
 }
 
-/* Full-screen camera: show full frame, same stream quality as before. */
+/* Full-screen camera: portrait “phone frame” so landscape sensor feeds don’t look like wide strips. */
 .liveVideoFullscreen {
   min-height: 0;
   max-height: none;
   width: 100%;
-  flex: 1;
-  max-width: 100%;
   height: 100%;
-  object-fit: contain;
+  flex: none;
+  max-width: 100%;
+  object-fit: cover;
+  object-position: center;
   border-radius: 12px;
   background: #000;
 }
@@ -489,12 +490,23 @@
 }
 
 .videoFullScreenInner .liveVideoShell {
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
-  width: 100%;
+  width: min(92vw, calc(70dvh * 9 / 16));
+  max-width: min(520px, 92vw);
+  aspect-ratio: 9 / 16;
+  max-height: 70dvh;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Undo .liveVideo min-height so the portrait frame controls size */
+.videoFullScreenInner .liveVideo {
+  min-height: 0;
+  max-height: none;
 }
 
 .liveCaptionOnDark {
