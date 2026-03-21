@@ -13,7 +13,7 @@ import {
   blobToVideoFile,
   cameraFailureMessage,
   canUseInPageRecording,
-  getFrontCameraStreamPortraitFirst,
+  getCameraStreamPortraitFirst,
   MAX_RECORDING_SECONDS,
   startAudioRecordingFromStream,
   startVideoRecordingFromStream,
@@ -117,6 +117,9 @@ export default function GuestPage() {
   const [recordHint, setRecordHint] = useState<string | null>(null);
   /** Seconds since recording started (for max-length UI). */
   const [recordingElapsedSec, setRecordingElapsedSec] = useState(0);
+  /** Front vs back lens — only applied when opening / swapping the camera stream. */
+  const [videoFacing, setVideoFacing] = useState<'user' | 'environment'>('user');
+  const [cameraFlipBusy, setCameraFlipBusy] = useState(false);
 
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
@@ -140,6 +143,7 @@ export default function GuestPage() {
     countdownModeRef.current = null;
     setCountdown(null);
     setLiveStreamForPreview(null);
+    setVideoFacing('user');
     if (liveVideoRef.current) {
       liveVideoRef.current.srcObject = null;
     }
@@ -290,6 +294,7 @@ export default function GuestPage() {
     setIsRecording(false);
     setLiveStreamForPreview(null);
     setRecordHint(null);
+    setVideoFacing('user');
     // Clear the previous input.
     setVideoFile(null);
     setAudioFile(null);
@@ -461,6 +466,26 @@ export default function GuestPage() {
     }
   }, []);
 
+  /** Swap front ↔ back during countdown only (recording is locked to one stream). */
+  const flipCameraDuringCountdown = useCallback(async () => {
+    if (cameraFlipBusy || isRecording) return;
+    if (countdown === null || countdown <= 0) return;
+    const next = videoFacing === 'user' ? 'environment' : 'user';
+    setCameraFlipBusy(true);
+    setRecordHint(null);
+    try {
+      const stream = await getCameraStreamPortraitFirst(next);
+      countdownStreamRef.current?.getTracks().forEach((t) => t.stop());
+      countdownStreamRef.current = stream;
+      setVideoFacing(next);
+      setLiveStreamForPreview(stream);
+    } catch {
+      setRecordHint(cameraFailureMessage());
+    } finally {
+      setCameraFlipBusy(false);
+    }
+  }, [cameraFlipBusy, isRecording, countdown, videoFacing]);
+
   /** Tick every second while recording; auto-stop at MAX_RECORDING_SECONDS. */
   useEffect(() => {
     if (!isRecording) {
@@ -560,7 +585,7 @@ export default function GuestPage() {
         }
         try {
           setRecordHint(null);
-          const stream = await getFrontCameraStreamPortraitFirst();
+          const stream = await getCameraStreamPortraitFirst(videoFacing);
           countdownStreamRef.current = stream;
           countdownModeRef.current = 'video';
           setLiveStreamForPreview(stream);
@@ -691,6 +716,7 @@ export default function GuestPage() {
     setIsRecording(false);
     setLiveStreamForPreview(null);
     setRecordHint(null);
+    setVideoFacing('user');
     setMode('video');
     setVideoFile(null);
     setAudioFile(null);
@@ -986,11 +1012,28 @@ export default function GuestPage() {
               <div className={styles.liveVideoShell}>
                 <video
                   ref={liveVideoRef}
-                  className={`${styles.liveVideo} ${styles.liveVideoMirror} ${styles.liveVideoFullscreen}`}
+                  className={`${styles.liveVideo} ${
+                    videoFacing === 'user' ? styles.liveVideoMirror : ''
+                  } ${styles.liveVideoFullscreen}`}
                   playsInline
                   muted
                   autoPlay
                 />
+                {!isRecording && countdown !== null && countdown > 0 ? (
+                  <button
+                    type="button"
+                    className={styles.flipCameraButton}
+                    onClick={() => void flipCameraDuringCountdown()}
+                    disabled={cameraFlipBusy}
+                    aria-label={
+                      videoFacing === 'user'
+                        ? 'Switch to camera on the back of the phone'
+                        : 'Switch to selfie camera'
+                    }
+                  >
+                    {cameraFlipBusy ? '…' : 'Flip'}
+                  </button>
+                ) : null}
                 {!isRecording && countdown !== null && countdown > 0 ? (
                   <div className={styles.countdownOverlay} aria-live="polite">
                     <span className={styles.countdownNumber}>{countdown}</span>

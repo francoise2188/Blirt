@@ -107,12 +107,25 @@ function isIOS(): boolean {
   return /iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
-/**
- * Prefer portrait (phone upright). We no longer fall back to landscape HD on phones —
- * that was forcing wide video. Desktop can still use landscape if nothing else works.
- */
-export async function getFrontCameraStreamPortraitFirst(): Promise<MediaStream> {
-  const portraitTries: MediaStreamConstraints[] = isIOS()
+/** Selfie vs world-facing lens (`user` = front on phones). */
+export type VideoCameraFacing = 'user' | 'environment';
+
+function withVideoFacing(
+  constraints: MediaStreamConstraints,
+  facing: VideoCameraFacing,
+): MediaStreamConstraints {
+  const v = constraints.video;
+  if (typeof v !== 'object' || v === null) {
+    return constraints;
+  }
+  return {
+    ...constraints,
+    video: { ...v, facingMode: facing },
+  };
+}
+
+function portraitTriesForFacing(facing: VideoCameraFacing): MediaStreamConstraints[] {
+  const bases = isIOS()
     ? [
         VIDEO_PORTRAIT_MINIMAL,
         VIDEO_PORTRAIT_ASPECT_ONLY,
@@ -129,6 +142,19 @@ export async function getFrontCameraStreamPortraitFirst(): Promise<MediaStream> 
         VIDEO_PORTRAIT_ASPECT_RANGE,
         VIDEO_PORTRAIT_MINIMAL,
       ];
+  return bases.map((c) => withVideoFacing(c, facing));
+}
+
+/**
+ * Prefer portrait (phone upright). We no longer fall back to landscape HD on phones —
+ * that was forcing wide video. Desktop can still use landscape if nothing else works.
+ *
+ * @param facing `user` = front/selfie, `environment` = back (when available).
+ */
+export async function getCameraStreamPortraitFirst(
+  facing: VideoCameraFacing = 'user',
+): Promise<MediaStream> {
+  const portraitTries = portraitTriesForFacing(facing);
 
   let lastErr: unknown;
   for (const c of portraitTries) {
@@ -141,13 +167,20 @@ export async function getFrontCameraStreamPortraitFirst(): Promise<MediaStream> 
 
   if (!isLikelyPhoneOrTablet()) {
     try {
-      return await navigator.mediaDevices.getUserMedia(VIDEO_CONSTRAINTS_FALLBACK);
+      return await navigator.mediaDevices.getUserMedia(
+        withVideoFacing(VIDEO_CONSTRAINTS_FALLBACK, facing),
+      );
     } catch (e) {
       lastErr = e;
     }
   }
 
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+/** @deprecated Use {@link getCameraStreamPortraitFirst} with `user`. */
+export async function getFrontCameraStreamPortraitFirst(): Promise<MediaStream> {
+  return getCameraStreamPortraitFirst('user');
 }
 
 export const AUDIO_CONSTRAINTS: MediaStreamConstraints = {
