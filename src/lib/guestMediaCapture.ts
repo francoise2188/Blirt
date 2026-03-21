@@ -101,19 +101,34 @@ function isLikelyPhoneOrTablet(): boolean {
   );
 }
 
+/** iOS often applies a tight crop when `aspectRatio` / fixed width×height are set first. */
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 /**
  * Prefer portrait (phone upright). We no longer fall back to landscape HD on phones —
  * that was forcing wide video. Desktop can still use landscape if nothing else works.
  */
 export async function getFrontCameraStreamPortraitFirst(): Promise<MediaStream> {
-  const portraitTries: MediaStreamConstraints[] = [
-    VIDEO_PORTRAIT_ASPECT_ONLY,
-    VIDEO_PORTRAIT_EXPLICIT,
-    VIDEO_PORTRAIT_HD,
-    VIDEO_CONSTRAINTS,
-    VIDEO_PORTRAIT_ASPECT_RANGE,
-    VIDEO_PORTRAIT_MINIMAL,
-  ];
+  const portraitTries: MediaStreamConstraints[] = isIOS()
+    ? [
+        VIDEO_PORTRAIT_MINIMAL,
+        VIDEO_PORTRAIT_ASPECT_ONLY,
+        VIDEO_PORTRAIT_EXPLICIT,
+        VIDEO_PORTRAIT_HD,
+        VIDEO_CONSTRAINTS,
+        VIDEO_PORTRAIT_ASPECT_RANGE,
+      ]
+    : [
+        VIDEO_PORTRAIT_ASPECT_ONLY,
+        VIDEO_PORTRAIT_EXPLICIT,
+        VIDEO_PORTRAIT_HD,
+        VIDEO_CONSTRAINTS,
+        VIDEO_PORTRAIT_ASPECT_RANGE,
+        VIDEO_PORTRAIT_MINIMAL,
+      ];
 
   let lastErr: unknown;
   for (const c of portraitTries) {

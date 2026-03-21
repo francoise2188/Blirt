@@ -443,10 +443,11 @@
   max-height: min(52vh, 480px);
   border-radius: 14px;
   background: #111;
-  object-fit: cover;
+  /* contain = show full camera frame (no “digital zoom” crop). cover was tight on iOS Safari. */
+  object-fit: contain;
 }
 
-/* Full-screen camera: portrait frame + cover (fills tall crop; avoids wide “landscape strip”). */
+/* Full-screen camera: portrait shell; contain avoids cover’s center-crop zoom on iPhone. */
 .liveVideoFullscreen {
   min-height: 0;
   max-height: none;
@@ -454,7 +455,7 @@
   height: 100%;
   flex: none;
   max-width: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   border-radius: 12px;
   background: #000;
@@ -508,9 +509,9 @@
   max-height: none;
 }
 
-/* Fullscreen mirror + slight scale so cover feels a bit less tight. */
+/* Mirror only — no extra scale (contain already shows full frame). */
 .videoFullScreenInner .liveVideoShell .liveVideo.liveVideoFullscreen.liveVideoMirror {
-  transform: scaleX(-1) scale(0.94);
+  transform: scaleX(-1);
   transform-origin: center center;
 }
 
