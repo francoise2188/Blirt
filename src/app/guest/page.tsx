@@ -11,6 +11,7 @@ import {
   AUDIO_CONSTRAINTS,
   blobToAudioFile,
   blobToVideoFile,
+  cameraFailureMessage,
   canUseInPageRecording,
   getFrontCameraStreamPortraitFirst,
   MAX_RECORDING_SECONDS,
@@ -397,16 +398,14 @@ export default function GuestPage() {
       }
       setVideoFile(blobToVideoFile(blob));
       setRecordHint(null);
-    } catch (e) {
+    } catch {
       liveRecordingRef.current = null;
       setLiveStreamForPreview(null);
       if (liveVideoRef.current) {
         liveVideoRef.current.srcObject = null;
       }
       setIsRecording(false);
-      setRecordHint(
-        e instanceof Error ? e.message : 'Could not finish recording. Try again.',
-      );
+      setRecordHint(cameraFailureMessage());
     }
   }, []);
 
@@ -529,9 +528,7 @@ export default function GuestPage() {
       }
       if (!videoFile) {
         if (!canUseInPageRecording()) {
-          setRecordHint(
-            'Recording in the browser isn’t supported here. Please open this page in Safari or Chrome on your phone.',
-          );
+          setRecordHint(cameraFailureMessage());
           return;
         }
         try {
@@ -541,12 +538,8 @@ export default function GuestPage() {
           countdownModeRef.current = 'video';
           setLiveStreamForPreview(stream);
           setCountdown(3);
-        } catch (e) {
-          setRecordHint(
-            e instanceof Error
-              ? e.message
-              : 'Could not use the camera. Check permissions and try again.',
-          );
+        } catch {
+          setRecordHint(cameraFailureMessage());
         }
         return;
       }
@@ -738,7 +731,6 @@ export default function GuestPage() {
         >
           <div className={styles.optionIcon}>🎥</div>
           <div className={styles.optionTitle}>Record a video</div>
-          <div className={styles.optionHint}>Real video, from your phone.</div>
         </button>
 
         <button

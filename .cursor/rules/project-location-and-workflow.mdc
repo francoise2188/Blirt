@@ -1,0 +1,32 @@
+---
+description: Where the real Blirt codebase lives (not OneDrive) — always read this first
+alwaysApply: true
+---
+
+# Blirt — which folder is the real project?
+
+## Source of truth
+
+- **The active codebase is `C:\BlirtProject`** (local folder on the PC, not under OneDrive).
+- **Do not treat the OneDrive copy as canonical.** The user may have a folder like  
+  `C:\Users\franc\OneDrive\Desktop\Blirt` (or similar) open in Cursor. That tree may be an **older copy**, a **partial export** (e.g. only `blirt-web`), or **out of sync** with what they run and push.
+
+## What to do as the AI assistant
+
+1. **Prefer `C:\BlirtProject`** for edits, `npm run dev`, `git` commands, and architecture questions unless the user explicitly says they are working only in another path.
+2. If the user’s workspace is OneDrive `Desktop\Blirt`, **warn them** that changes there may not match production work; suggest opening **`C:\BlirtProject`** as the project root in Cursor when possible.
+3. **Git:** Commits and `git push` should be run from **`C:\BlirtProject`** where `main` tracks the real repo.
+
+## Tech stack (BlirtProject)
+
+- **Next.js** app (guest page: in-browser camera/mic recording, prompts, name field; host dashboard; Supabase).
+- **Guest media:** `src/lib/guestMediaCapture.ts` (getUserMedia, MediaRecorder, portrait-first video, max recording length, `CAMERA_BLOCKED_MESSAGE` / `cameraFailureMessage()` for guest-facing camera errors).
+- **Backend / data:** Supabase (events, blirts, storage uploads via `submitGuestBlirt` and related helpers).
+
+## Git remote (FYI)
+
+- Remote may show as **`https://github.com/francoise2188/Blirt.git`** (repo name casing can vary; GitHub may redirect).
+
+## Short summary for the user
+
+> “We develop and push from **`C:\BlirtProject`**. The OneDrive **`Desktop\Blirt`** folder is not the main project—use BlirtProject so the AI and your tools see the same code as `localhost` and GitHub.”

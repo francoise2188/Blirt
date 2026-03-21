@@ -1,6 +1,6 @@
 /**
  * Guest page: record video/audio with the device camera & mic (better quality than
- * relying on the OS file picker). Falls back to file upload if APIs aren't available.
+ * relying on the OS file picker). Video errors use {@link CAMERA_BLOCKED_MESSAGE} from here.
  *
  * Why not a npm “recording library”? Most (RecordRTC, etc.) still use the same browser
  * APIs underneath (getUserMedia + MediaRecorder). They add helpers and fallbacks, not
@@ -175,9 +175,18 @@ export function canUseInPageRecording(): boolean {
   return (
     typeof window !== 'undefined' &&
     typeof navigator !== 'undefined' &&
+    window.isSecureContext &&
     Boolean(navigator.mediaDevices?.getUserMedia) &&
     typeof MediaRecorder !== 'undefined'
   );
+}
+
+/** Single guest-facing line when video recording can’t start or finish (any technical cause). */
+export const CAMERA_BLOCKED_MESSAGE =
+  'Permission blocked — Allow in the prompt; fix camera Settings for Safari/Chrome; avoid in-app browsers; open in Safari/Chrome.';
+
+export function cameraFailureMessage(): string {
+  return CAMERA_BLOCKED_MESSAGE;
 }
 
 export function blobToVideoFile(blob: Blob): File {
