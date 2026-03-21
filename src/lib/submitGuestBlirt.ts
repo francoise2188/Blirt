@@ -14,9 +14,10 @@ function extFromFile(file: File, kind: 'video' | 'audio'): string {
   }
   if (t.includes('wav')) return 'wav';
   if (t.includes('mpeg') || t.includes('mp3')) return 'mp3';
+  if (t.includes('mp4')) return 'm4a';
   if (t.includes('webm')) return 'webm';
   if (t.includes('ogg')) return 'ogg';
-  return 'webm';
+  return 'm4a';
 }
 
 function newId(): string {
@@ -28,7 +29,14 @@ function newId(): string {
 
 export async function submitGuestMediaBlirt(
   supabase: SupabaseClient,
-  params: { eventId: string; file: File; type: 'video' | 'audio'; guestName?: string | null }
+  params: {
+    eventId: string;
+    file: File;
+    type: 'video' | 'audio';
+    guestName?: string | null;
+    /** Prompt text the guest saw when recording (optional; requires DB column — see supabase/blirts_prompt_snapshot.sql). */
+    promptSnapshot?: string | null;
+  },
 ): Promise<{ error: string | null }> {
   const id = newId();
   const ext = extFromFile(params.file, params.type);
@@ -36,9 +44,10 @@ export async function submitGuestMediaBlirt(
 
   const contentType =
     params.file.type ||
-    (params.type === 'video' ? 'video/mp4' : 'audio/webm');
+    (params.type === 'video' ? 'video/mp4' : 'audio/mp4');
 
   const guestName = params.guestName?.trim() || null;
+  const promptSnapshot = params.promptSnapshot?.trim() || null;
 
   const { error: insErr } = await supabase.from('blirts').insert({
     id,
@@ -47,6 +56,7 @@ export async function submitGuestMediaBlirt(
     type: params.type,
     content: path,
     status: 'pending',
+    prompt_snapshot: promptSnapshot,
   });
 
   if (insErr) {

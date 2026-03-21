@@ -223,12 +223,14 @@ export function pickVideoMimeType(): string {
 }
 
 export function pickAudioMimeType(): string {
+  // Safari (esp. iOS) often records silence or broken audio with WebM/Opus; prefer MP4/AAC first.
   return supportedMime([
-    'audio/webm;codecs=opus',
-    'audio/webm',
     'audio/mp4',
+    'audio/mp4;codecs=mp4a.40.2',
     'audio/mp4;codecs=aac',
     'audio/aac',
+    'audio/webm;codecs=opus',
+    'audio/webm',
   ]);
 }
 
@@ -257,14 +259,17 @@ export function blobToVideoFile(blob: Blob): File {
 }
 
 export function blobToAudioFile(blob: Blob): File {
-  const type = blob.type || 'audio/webm';
-  const ext =
-    type.includes('mp4') || type.includes('mpeg') || type.includes('aac')
-      ? 'm4a'
-      : type.includes('webm')
-        ? 'webm'
-        : 'webm';
-  return new File([blob], `blirt-audio-${Date.now()}.${ext}`, { type });
+  const t = (blob.type || '').toLowerCase();
+  if (t.includes('webm')) {
+    return new File([blob], `blirt-audio-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
+  }
+  if (t.includes('ogg')) {
+    return new File([blob], `blirt-audio-${Date.now()}.ogg`, { type: blob.type || 'audio/ogg' });
+  }
+  if (t.includes('mp4') || t.includes('mpeg') || t.includes('aac') || t.includes('m4a')) {
+    return new File([blob], `blirt-audio-${Date.now()}.m4a`, { type: blob.type || 'audio/mp4' });
+  }
+  return new File([blob], `blirt-audio-${Date.now()}.m4a`, { type: blob.type || 'audio/mp4' });
 }
 
 export type LiveRecording = {
@@ -289,7 +294,10 @@ function createRecorderSession(stream: MediaStream, kind: 'video' | 'audio'): Li
       opts.audioBitsPerSecond = 128_000;
     }
   } else {
-    opts.audioBitsPerSecond = isMobileLike() ? 96_000 : 128_000;
+    // Omit fixed bitrate on phones — Safari can produce silent files when forced (same idea as video).
+    if (!isMobileLike()) {
+      opts.audioBitsPerSecond = 128_000;
+    }
   }
 
   let recorder: MediaRecorder;

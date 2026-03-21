@@ -46,6 +46,7 @@ type BlirtRow = {
   status: string | null;
   created_at: string | null;
   guest_name: string | null;
+  prompt_snapshot?: string | null;
 };
 
 function escapeCsv(value: string) {
@@ -101,7 +102,7 @@ export default function HostEventManagePage() {
     if (!supabase || !eventId) return;
     const { data, error } = await supabase
       .from('blirts')
-      .select('id, event_id, type, content, status, created_at, guest_name')
+      .select('id, event_id, type, content, status, created_at, guest_name, prompt_snapshot')
       .eq('event_id', eventId)
       .order('created_at', { ascending: false });
     if (error) return;
@@ -268,6 +269,7 @@ export default function HostEventManagePage() {
           'id',
           'type',
           'guest_name',
+          'prompt_snapshot',
           'status',
           'created_at',
           'message_text_or_storage_path',
@@ -290,6 +292,7 @@ export default function HostEventManagePage() {
           b.id,
           b.type,
           b.guest_name ?? '',
+          (b.prompt_snapshot ?? '').trim(),
           b.status ?? '',
           b.created_at ?? '',
           b.content,
@@ -526,6 +529,7 @@ export default function HostEventManagePage() {
               const t = (b.type || '').toLowerCase();
               const url = mediaUrls[b.id];
               const guest = (b.guest_name ?? '').trim();
+              const promptLine = (b.prompt_snapshot ?? '').trim();
               return (
                 <div key={b.id} className={styles.blirtRow}>
                   <input
@@ -546,6 +550,11 @@ export default function HostEventManagePage() {
                       {guest ? ` · From: ${guest}` : ''} · {b.status ?? '—'} ·{' '}
                       {b.created_at ? new Date(b.created_at).toLocaleString() : ''}
                     </div>
+                    {promptLine ? (
+                      <div className={styles.blirtPreviewPrompt}>
+                        <span className={styles.blirtPromptLabel}>Prompt</span> {promptLine}
+                      </div>
+                    ) : null}
                     {t === 'text' && (
                       <div className={styles.blirtPreviewText}>{b.content}</div>
                     )}
@@ -619,6 +628,12 @@ export default function HostEventManagePage() {
                 ? new Date(viewerBlirt.created_at).toLocaleString()
                 : ''}
             </div>
+            {(viewerBlirt.prompt_snapshot ?? '').trim() ? (
+              <p className={styles.modalPrompt}>
+                <span className={styles.blirtPromptLabel}>Prompt</span>{' '}
+                {(viewerBlirt.prompt_snapshot ?? '').trim()}
+              </p>
+            ) : null}
             {(() => {
               const vt = (viewerBlirt.type || '').toLowerCase();
               if (vt === 'text') {

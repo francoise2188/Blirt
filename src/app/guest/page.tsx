@@ -556,6 +556,7 @@ export default function GuestPage() {
           type: 'text',
           content: message.trim(),
           status: 'pending',
+          prompt_snapshot: couple.prompt.trim() || null,
         });
 
         if (error) {
@@ -611,6 +612,7 @@ export default function GuestPage() {
           file: videoFile,
           type: 'video',
           guestName: guestName.trim() || null,
+          promptSnapshot: couple.prompt.trim() || null,
         });
         if (mediaErr) {
           setEventError(mediaErr);
@@ -670,6 +672,7 @@ export default function GuestPage() {
         file: audioFile,
         type: 'audio',
         guestName: guestName.trim() || null,
+        promptSnapshot: couple.prompt.trim() || null,
       });
       if (mediaErr) {
         setEventError(mediaErr);

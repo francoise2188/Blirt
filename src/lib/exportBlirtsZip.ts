@@ -6,6 +6,7 @@ type BlirtRow = {
   content: string;
   created_at: string | null;
   guest_name: string | null;
+  prompt_snapshot?: string | null;
 };
 
 /**
@@ -25,15 +26,14 @@ export async function buildBlirtsZip(params: {
   for (const b of params.items) {
     const t = (b.type || '').toLowerCase();
     if (t === 'text') {
-      const body = [
+      const prompt = (b.prompt_snapshot ?? '').trim();
+      const head = [
         `Guest name: ${b.guest_name?.trim() || '(not provided)'}`,
         `Created: ${b.created_at ?? ''}`,
         `Blirt id: ${b.id}`,
-        '',
-        '— Message —',
-        '',
-        b.content,
-      ].join('\n');
+      ];
+      if (prompt) head.push(`Prompt: ${prompt}`);
+      const body = [...head, '', '— Message —', '', b.content].join('\n');
       folder?.file(`text-${b.id.slice(0, 8)}.txt`, body);
       continue;
     }
@@ -57,9 +57,22 @@ export async function buildBlirtsZip(params: {
           continue;
         }
         const blob = await res.blob();
-        const ext = b.content.includes('.') ? (b.content.split('.').pop() ?? 'bin') : t === 'video' ? 'mp4' : 'webm';
-        const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext : t === 'video' ? 'mp4' : 'webm';
+        const ext = b.content.includes('.') ? (b.content.split('.').pop() ?? 'bin') : t === 'video' ? 'mp4' : 'm4a';
+        const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext : t === 'video' ? 'mp4' : 'm4a';
         folder?.file(`${t}-${b.id.slice(0, 8)}.${safeExt}`, blob);
+        const prompt = (b.prompt_snapshot ?? '').trim();
+        const meta = [
+          `Type: ${t}`,
+          `Guest: ${b.guest_name?.trim() || '(not provided)'}`,
+          `Created: ${b.created_at ?? ''}`,
+          `Blirt id: ${b.id}`,
+          prompt ? `Prompt: ${prompt}` : '',
+          '',
+          `Media file: ${t}-${b.id.slice(0, 8)}.${safeExt}`,
+        ]
+          .filter((line) => line !== '')
+          .join('\n');
+        folder?.file(`${t}-${b.id.slice(0, 8)}-info.txt`, meta);
       } catch (e) {
         skipped.push(`${b.id}: ${e instanceof Error ? e.message : 'fetch failed'}`);
       }
