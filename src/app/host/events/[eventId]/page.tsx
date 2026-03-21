@@ -89,6 +89,7 @@ export default function HostEventManagePage() {
 
   const [exporting, setExporting] = useState(false);
   const [zipExporting, setZipExporting] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [qrBusy, setQrBusy] = useState(false);
   const qrWrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -185,7 +186,7 @@ export default function HostEventManagePage() {
   }, [blirts]);
 
   async function deleteBlirt(b: BlirtRow) {
-    if (!supabase) return;
+    if (!supabase || bulkDeleting) return;
     const ok = window.confirm('Delete this Blirt permanently?');
     if (!ok) return;
     setBusyId(b.id);
@@ -198,6 +199,45 @@ export default function HostEventManagePage() {
     setViewerBlirt((prev) => (prev?.id === b.id ? null : prev));
     setSelectedIds((prev) => prev.filter((id) => id !== b.id));
     loadBlirts();
+  }
+
+  async function deleteBlirtsBulk(items: BlirtRow[]) {
+    if (!supabase || !items.length || bulkDeleting) return;
+    const n = items.length;
+    const ok = window.confirm(
+      n === 1
+        ? 'Delete this Blirt permanently? This cannot be undone.'
+        : `Delete ${n} Blirts permanently? This cannot be undone.`,
+    );
+    if (!ok) return;
+    setBulkDeleting(true);
+    try {
+      const ids = items.map((b) => b.id);
+      const paths: string[] = [];
+      for (const b of items) {
+        const t = (b.type || '').toLowerCase();
+        if ((t === 'video' || t === 'audio') && b.content.includes('/')) {
+          paths.push(b.content);
+        }
+      }
+      if (paths.length) {
+        const { error: stoErr } = await supabase.storage.from('blirts-media').remove(paths);
+        if (stoErr) {
+          window.alert(`Could not remove all files from storage: ${stoErr.message}`);
+          return;
+        }
+      }
+      const { error } = await supabase.from('blirts').delete().in('id', ids);
+      if (error) {
+        window.alert(error.message);
+        return;
+      }
+      setViewerBlirt((prev) => (prev && ids.includes(prev.id) ? null : prev));
+      setSelectedIds([]);
+      loadBlirts();
+    } finally {
+      setBulkDeleting(false);
+    }
   }
 
   const allSelected = blirts.length > 0 && selectedIds.length === blirts.length;
@@ -475,7 +515,7 @@ export default function HostEventManagePage() {
         <div className={styles.card}>
           <div className={styles.h2}>Blirts ({blirts.length})</div>
           <p className={styles.muted} style={{ marginBottom: 12 }}>
-            Click a row to open and view. Use checkboxes to export only what you select, or export everything.
+            Click a row to open and view. Use checkboxes for export or for delete, or delete everything in one step.
           </p>
           <p className={styles.muted} style={{ marginBottom: 12, fontSize: 13, lineHeight: 1.45 }}>
             <strong>CSV</strong> = spreadsheet with text plus <strong>clickable links</strong> to video/audio (not the video files themselves).{' '}
@@ -486,7 +526,7 @@ export default function HostEventManagePage() {
               type="button"
               className={`${styles.button} ${styles.buttonGhost}`}
               onClick={() => exportCsvAll()}
-              disabled={exporting || zipExporting || blirts.length === 0}
+              disabled={exporting || zipExporting || bulkDeleting || blirts.length === 0}
             >
               {exporting ? 'Exporting…' : 'Export all (CSV)'}
             </button>
@@ -494,7 +534,7 @@ export default function HostEventManagePage() {
               type="button"
               className={`${styles.button} ${styles.buttonGhost}`}
               onClick={() => exportCsvSelected()}
-              disabled={exporting || zipExporting || selectedIds.length === 0}
+              disabled={exporting || zipExporting || bulkDeleting || selectedIds.length === 0}
             >
               {exporting ? 'Exporting…' : `Export selected (${selectedIds.length}) CSV`}
             </button>
@@ -502,7 +542,7 @@ export default function HostEventManagePage() {
               type="button"
               className={`${styles.button} ${styles.buttonGhost}`}
               onClick={() => exportZipAll()}
-              disabled={zipExporting || exporting || blirts.length === 0}
+              disabled={zipExporting || exporting || bulkDeleting || blirts.length === 0}
             >
               {zipExporting ? 'Building ZIP…' : 'Download all (ZIP)'}
             </button>
@@ -510,9 +550,36 @@ export default function HostEventManagePage() {
               type="button"
               className={`${styles.button} ${styles.buttonGhost}`}
               onClick={() => exportZipSelected()}
-              disabled={zipExporting || exporting || selectedIds.length === 0}
+              disabled={zipExporting || exporting || bulkDeleting || selectedIds.length === 0}
             >
               {zipExporting ? 'Building ZIP…' : `Download selected (${selectedIds.length}) ZIP`}
+            </button>
+          </div>
+          <div className={styles.exportRow}>
+            <button
+              type="button"
+              className={`${styles.button} ${styles.buttonDanger}`}
+              onClick={() => {
+                const items = blirts.filter((b) => selectedIds.includes(b.id));
+                void deleteBlirtsBulk(items);
+              }}
+              disabled={
+                bulkDeleting ||
+                exporting ||
+                zipExporting ||
+                selectedIds.length === 0 ||
+                blirts.length === 0
+              }
+            >
+              {bulkDeleting ? 'Deleting…' : `Delete selected (${selectedIds.length})`}
+            </button>
+            <button
+              type="button"
+              className={`${styles.button} ${styles.buttonDanger}`}
+              onClick={() => void deleteBlirtsBulk(blirts)}
+              disabled={bulkDeleting || exporting || zipExporting || blirts.length === 0}
+            >
+              {bulkDeleting ? 'Deleting…' : `Delete all (${blirts.length})`}
             </button>
           </div>
           {blirts.length > 0 && (
@@ -588,7 +655,7 @@ export default function HostEventManagePage() {
                         e.stopPropagation();
                         deleteBlirt(b);
                       }}
-                      disabled={busyId === b.id}
+                      disabled={busyId === b.id || bulkDeleting}
                     >
                       Delete
                     </button>
@@ -669,7 +736,7 @@ export default function HostEventManagePage() {
                 onClick={() => {
                   deleteBlirt(viewerBlirt);
                 }}
-                disabled={busyId === viewerBlirt.id}
+                disabled={busyId === viewerBlirt.id || bulkDeleting}
               >
                 Delete
               </button>
