@@ -293,7 +293,9 @@
 
 .modalVideo {
   width: 100%;
-  max-height: 60vh;
+  max-height: min(70vh, 900px);
+  height: auto;
+  object-fit: contain;
   border-radius: 12px;
   background: #000;
 }

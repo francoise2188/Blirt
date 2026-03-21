@@ -6,14 +6,15 @@ import styles from './page.module.css';
 import { supabase } from '../../lib/supabaseClient';
 import { submitGuestMediaBlirt } from '../../lib/submitGuestBlirt';
 import { GUEST_MAX_PROMPT_SKIPS } from '../../lib/promptLibrary';
+import { VideoFit } from '../../components/VideoFit';
 import {
   AUDIO_CONSTRAINTS,
   blobToAudioFile,
   blobToVideoFile,
   canUseInPageRecording,
+  getFrontCameraStreamPortraitFirst,
   startAudioRecordingFromStream,
   startVideoRecordingFromStream,
-  VIDEO_CONSTRAINTS,
   type LiveRecording,
 } from '../../lib/guestMediaCapture';
 
@@ -472,7 +473,7 @@ export default function GuestPage() {
         }
         try {
           setRecordHint(null);
-          const stream = await navigator.mediaDevices.getUserMedia(VIDEO_CONSTRAINTS);
+          const stream = await getFrontCameraStreamPortraitFirst();
           countdownStreamRef.current = stream;
           countdownModeRef.current = 'video';
           setLiveStreamForPreview(stream);
@@ -771,12 +772,7 @@ export default function GuestPage() {
             {!showVideoFullscreen && videoPreviewUrl ? (
               <>
                 <div className={styles.preview}>
-                  <video
-                    src={videoPreviewUrl}
-                    controls
-                    playsInline
-                    className={styles.previewMedia}
-                  />
+                  <VideoFit src={videoPreviewUrl} />
                 </div>
                 <div className={styles.retakeRow}>
                   <button

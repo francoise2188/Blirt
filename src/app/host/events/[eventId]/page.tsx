@@ -13,6 +13,7 @@ import {
   svgQrToPngDataUrl,
 } from '../../../../lib/qrExport';
 import { buildBlirtsZip } from '../../../../lib/exportBlirtsZip';
+import { VideoFit } from '../../../../components/VideoFit';
 import { getPromptLibraryForEventType } from '../../../../lib/promptLibrary';
 import styles from '../../host.module.css';
 
@@ -628,14 +629,7 @@ export default function HostEventManagePage() {
                 );
               }
               if (vt === 'video' && viewerUrl) {
-                return (
-                  <video
-                    src={viewerUrl}
-                    controls
-                    playsInline
-                    className={styles.modalVideo}
-                  />
-                );
+                return <VideoFit src={viewerUrl} variant="modal" />;
               }
               if (vt === 'audio' && viewerUrl) {
                 return <audio src={viewerUrl} controls className={styles.modalAudio} />;

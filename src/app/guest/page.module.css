@@ -230,6 +230,14 @@
   display: block;
 }
 
+/* After recording: keep correct aspect ratio (no squashing). */
+.previewVideo {
+  height: auto;
+  max-height: min(78vh, 960px);
+  object-fit: contain;
+  background: #0a0a0a;
+}
+
 .textarea {
   width: 100%;
   border-radius: 14px;

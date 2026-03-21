@@ -8,20 +8,77 @@
  * defaults (HD-friendly constraints + bitrate) here without extra bundle weight.
  */
 
-/** Ask for HD when the device can do it; browser picks actual supported size. */
+const AUDIO_FOR_VIDEO: MediaStreamConstraints['audio'] = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  channelCount: 1,
+};
+
+/**
+ * Portrait-first. Mixing width + height + aspectRatio together confuses some mobile
+ * browsers and can yield rotated/sideways encodes. We try simple constraints first.
+ */
+const VIDEO_PORTRAIT_ASPECT_ONLY: MediaStreamConstraints = {
+  video: {
+    facingMode: 'user',
+    aspectRatio: { ideal: 9 / 16 },
+    frameRate: { ideal: 30, max: 60 },
+  },
+  audio: AUDIO_FOR_VIDEO,
+};
+
+/** Explicit portrait pixels (height > width). */
+const VIDEO_PORTRAIT_EXPLICIT: MediaStreamConstraints = {
+  video: {
+    facingMode: 'user',
+    width: { ideal: 720, min: 360 },
+    height: { ideal: 1280, min: 640 },
+    frameRate: { ideal: 30, max: 60 },
+  },
+  audio: AUDIO_FOR_VIDEO,
+};
+
+/** Legacy export — aspect + explicit dimensions (kept for any external use). */
 export const VIDEO_CONSTRAINTS: MediaStreamConstraints = {
+  video: {
+    facingMode: 'user',
+    width: { ideal: 1080, min: 480 },
+    height: { ideal: 1920, min: 720 },
+    aspectRatio: { ideal: 9 / 16 },
+    frameRate: { ideal: 30, max: 60 },
+  },
+  audio: AUDIO_FOR_VIDEO,
+};
+
+/** If portrait fails, typical HD landscape (last resort). */
+export const VIDEO_CONSTRAINTS_FALLBACK: MediaStreamConstraints = {
   video: {
     facingMode: 'user',
     width: { ideal: 1920, min: 640 },
     height: { ideal: 1080, min: 480 },
     frameRate: { ideal: 30, max: 60 },
   },
-  audio: {
-    echoCancellation: true,
-    noiseSuppression: true,
-    channelCount: 1,
-  },
+  audio: AUDIO_FOR_VIDEO,
 };
+
+/** Prefer portrait stream; several tries so recording still works everywhere. */
+export async function getFrontCameraStreamPortraitFirst(): Promise<MediaStream> {
+  const tries: MediaStreamConstraints[] = [
+    VIDEO_PORTRAIT_ASPECT_ONLY,
+    VIDEO_PORTRAIT_EXPLICIT,
+    VIDEO_CONSTRAINTS,
+    VIDEO_CONSTRAINTS_FALLBACK,
+  ];
+  let lastErr: unknown;
+  for (const c of tries) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(c);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
 
 export const AUDIO_CONSTRAINTS: MediaStreamConstraints = {
   audio: {
