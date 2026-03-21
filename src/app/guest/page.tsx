@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import styles from './page.module.css';
 import { supabase } from '../../lib/supabaseClient';
@@ -13,6 +13,7 @@ import {
   blobToVideoFile,
   canUseInPageRecording,
   getFrontCameraStreamPortraitFirst,
+  MAX_RECORDING_SECONDS,
   startAudioRecordingFromStream,
   startVideoRecordingFromStream,
   type LiveRecording,
@@ -35,6 +36,15 @@ function pickNextTemplate(pool: string[], current: string): string {
 
 const fallbackDemoCouple = { a: 'Avery', b: 'Jordan' };
 const fallbackDemoPrompt = 'Give them one piece of marriage advice';
+
+function formatRecordingClock(elapsedSec: number, maxSeconds: number): string {
+  const e = Math.max(0, Math.min(elapsedSec, maxSeconds));
+  const em = Math.floor(e / 60);
+  const es = e % 60;
+  const mm = Math.floor(maxSeconds / 60);
+  const ms = maxSeconds % 60;
+  return `${em}:${es.toString().padStart(2, '0')} / ${mm}:${ms.toString().padStart(2, '0')}`;
+}
 
 function fillPrompt(template: string, partner1: string, partner2: string) {
   const p1 = partner1.trim();
@@ -95,6 +105,8 @@ export default function GuestPage() {
   /** Camera stream for live preview — must attach after <video> mounts (fixes black box). */
   const [liveStreamForPreview, setLiveStreamForPreview] = useState<MediaStream | null>(null);
   const [recordHint, setRecordHint] = useState<string | null>(null);
+  /** Seconds since recording started (for max-length UI). */
+  const [recordingElapsedSec, setRecordingElapsedSec] = useState(0);
 
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
@@ -365,6 +377,86 @@ export default function GuestPage() {
     return audioFile ? 'Submit' : 'Record';
   }, [audioFile, countdown, isRecording, mode, submitted, videoFile]);
 
+  const stopVideoRecording = useCallback(async () => {
+    const live = liveRecordingRef.current;
+    if (!live) {
+      setIsRecording(false);
+      return;
+    }
+    try {
+      const blob = await live.stop();
+      liveRecordingRef.current = null;
+      setLiveStreamForPreview(null);
+      if (liveVideoRef.current) {
+        liveVideoRef.current.srcObject = null;
+      }
+      setIsRecording(false);
+      if (blob.size < 80) {
+        setRecordHint('That clip was too short — try recording a bit longer.');
+        return;
+      }
+      setVideoFile(blobToVideoFile(blob));
+      setRecordHint(null);
+    } catch (e) {
+      liveRecordingRef.current = null;
+      setLiveStreamForPreview(null);
+      if (liveVideoRef.current) {
+        liveVideoRef.current.srcObject = null;
+      }
+      setIsRecording(false);
+      setRecordHint(
+        e instanceof Error ? e.message : 'Could not finish recording. Try again.',
+      );
+    }
+  }, []);
+
+  const stopAudioRecording = useCallback(async () => {
+    const live = liveRecordingRef.current;
+    if (!live) {
+      setIsRecording(false);
+      return;
+    }
+    try {
+      const blob = await live.stop();
+      liveRecordingRef.current = null;
+      setIsRecording(false);
+      if (blob.size < 80) {
+        setRecordHint('That voice note was too short — try again.');
+        return;
+      }
+      setAudioFile(blobToAudioFile(blob));
+      setRecordHint(null);
+    } catch (e) {
+      liveRecordingRef.current = null;
+      setIsRecording(false);
+      setRecordHint(
+        e instanceof Error ? e.message : 'Could not finish recording. Try again.',
+      );
+    }
+  }, []);
+
+  /** Tick every second while recording; auto-stop at MAX_RECORDING_SECONDS. */
+  useEffect(() => {
+    if (!isRecording) {
+      setRecordingElapsedSec(0);
+      return;
+    }
+    setRecordingElapsedSec(0);
+    const tick = window.setInterval(() => {
+      setRecordingElapsedSec((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [isRecording]);
+
+  useEffect(() => {
+    if (!isRecording) return;
+    const t = window.setTimeout(() => {
+      if (mode === 'video') void stopVideoRecording();
+      else if (mode === 'audio') void stopAudioRecording();
+    }, MAX_RECORDING_SECONDS * 1000);
+    return () => clearTimeout(t);
+  }, [isRecording, mode, stopAudioRecording, stopVideoRecording]);
+
   /** Full-screen camera layer (countdown + record) so the page doesn’t scroll/jump each second. */
   const showVideoFullscreen = useMemo(
     () =>
@@ -432,36 +524,7 @@ export default function GuestPage() {
 
     if (mode === 'video') {
       if (isRecording) {
-        const live = liveRecordingRef.current;
-        if (!live) {
-          setIsRecording(false);
-          return;
-        }
-        try {
-          const blob = await live.stop();
-          liveRecordingRef.current = null;
-          setLiveStreamForPreview(null);
-          if (liveVideoRef.current) {
-            liveVideoRef.current.srcObject = null;
-          }
-          setIsRecording(false);
-          if (blob.size < 80) {
-            setRecordHint('That clip was too short — try recording a bit longer.');
-            return;
-          }
-          setVideoFile(blobToVideoFile(blob));
-          setRecordHint(null);
-        } catch (e) {
-          liveRecordingRef.current = null;
-          setLiveStreamForPreview(null);
-          if (liveVideoRef.current) {
-            liveVideoRef.current.srcObject = null;
-          }
-          setIsRecording(false);
-          setRecordHint(
-            e instanceof Error ? e.message : 'Could not finish recording. Try again.',
-          );
-        }
+        await stopVideoRecording();
         return;
       }
       if (!videoFile) {
@@ -519,28 +582,7 @@ export default function GuestPage() {
 
     // audio
     if (isRecording) {
-      const live = liveRecordingRef.current;
-      if (!live) {
-        setIsRecording(false);
-        return;
-      }
-      try {
-        const blob = await live.stop();
-        liveRecordingRef.current = null;
-        setIsRecording(false);
-        if (blob.size < 80) {
-          setRecordHint('That voice note was too short — try again.');
-          return;
-        }
-        setAudioFile(blobToAudioFile(blob));
-        setRecordHint(null);
-      } catch (e) {
-        liveRecordingRef.current = null;
-        setIsRecording(false);
-        setRecordHint(
-          e instanceof Error ? e.message : 'Could not finish recording. Try again.',
-        );
-      }
+      await stopAudioRecording();
       return;
     }
     if (!audioFile) {
@@ -790,8 +832,8 @@ export default function GuestPage() {
             ) : null}
             {!showVideoFullscreen && !videoPreviewUrl ? (
               <div className={styles.helpBox}>
-                Tap <strong>Record</strong> to open your camera and film here. You can retake before
-                you send.
+                Tap <strong>Record</strong> to open your camera and film here (up to {MAX_RECORDING_SECONDS}{' '}
+                seconds). You can retake before you send.
               </div>
             ) : null}
           </>
@@ -805,9 +847,35 @@ export default function GuestPage() {
               type="file"
               accept="audio/*"
               onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
-                setAudioFile(f);
-                setRecordHint(null);
+                const input = e.target;
+                const f = input.files?.[0] ?? null;
+                input.value = '';
+                if (!f) return;
+                void (async () => {
+                  const url = URL.createObjectURL(f);
+                  const dur = await new Promise<number | null>((resolve) => {
+                    const el = document.createElement('audio');
+                    el.preload = 'metadata';
+                    el.src = url;
+                    el.onloadedmetadata = () => {
+                      URL.revokeObjectURL(url);
+                      const d = el.duration;
+                      resolve(Number.isFinite(d) ? d : null);
+                    };
+                    el.onerror = () => {
+                      URL.revokeObjectURL(url);
+                      resolve(null);
+                    };
+                  });
+                  if (dur != null && dur > MAX_RECORDING_SECONDS + 0.25) {
+                    setRecordHint(
+                      `That file is about ${Math.ceil(dur)}s. Please use a voice note under ${MAX_RECORDING_SECONDS} seconds.`,
+                    );
+                    return;
+                  }
+                  setAudioFile(f);
+                  setRecordHint(null);
+                })();
               }}
             />
 
@@ -829,7 +897,8 @@ export default function GuestPage() {
               <div className={styles.audioRecordingBox} role="status">
                 <span className={styles.recDot} aria-hidden />
                 <p className={styles.audioRecordingText}>
-                  Recording your voice — tap <strong>Stop</strong> when you&apos;re done.
+                  Recording your voice — {formatRecordingClock(recordingElapsedSec, MAX_RECORDING_SECONDS)}.
+                  Tap <strong>Stop</strong> when you&apos;re done (max {MAX_RECORDING_SECONDS}s).
                 </p>
               </div>
             ) : audioPreviewUrl ? (
@@ -839,8 +908,8 @@ export default function GuestPage() {
             ) : (
               <>
                 <div className={styles.helpBox}>
-                  Tap <strong>Record</strong> to use your microphone for a voice note (not the photo
-                  library).
+                  Tap <strong>Record</strong> to use your microphone for a voice note (up to{' '}
+                  {MAX_RECORDING_SECONDS}s — not the photo library).
                 </div>
                 <button
                   type="button"
@@ -903,7 +972,9 @@ export default function GuestPage() {
               <p className={styles.liveCaptionOnDark}>
                 {isRecording ? (
                   <>
-                    Recording — tap <strong>Stop</strong> below when you&apos;re finished.
+                    Recording {formatRecordingClock(recordingElapsedSec, MAX_RECORDING_SECONDS)} — tap{' '}
+                    <strong>Stop</strong> below, or recording stops automatically at{' '}
+                    {MAX_RECORDING_SECONDS}s.
                   </>
                 ) : (
                   <>Get ready…</>

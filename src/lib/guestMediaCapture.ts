@@ -8,6 +8,9 @@
  * defaults (HD-friendly constraints + bitrate) here without extra bundle weight.
  */
 
+/** Max length for in-page video/voice recording (seconds). */
+export const MAX_RECORDING_SECONDS = 30;
+
 const AUDIO_FOR_VIDEO: MediaStreamConstraints['audio'] = {
   echoCancellation: true,
   noiseSuppression: true,
@@ -38,6 +41,36 @@ const VIDEO_PORTRAIT_EXPLICIT: MediaStreamConstraints = {
   audio: AUDIO_FOR_VIDEO,
 };
 
+/** 1080×1920 style portrait (tall). */
+const VIDEO_PORTRAIT_HD: MediaStreamConstraints = {
+  video: {
+    facingMode: 'user',
+    width: { ideal: 1080, max: 1080 },
+    height: { ideal: 1920, min: 720 },
+    aspectRatio: { ideal: 9 / 16 },
+    frameRate: { ideal: 30, max: 60 },
+  },
+  audio: AUDIO_FOR_VIDEO,
+};
+
+/** Narrow aspect range ≈ phone portrait (width/height between ~0.5 and 0.65). */
+const VIDEO_PORTRAIT_ASPECT_RANGE: MediaStreamConstraints = {
+  video: {
+    facingMode: 'user',
+    aspectRatio: { min: 0.5, max: 0.65 },
+    frameRate: { ideal: 30, max: 60 },
+  },
+  audio: AUDIO_FOR_VIDEO,
+};
+
+/** Minimal — many phones default to portrait for the selfie camera. */
+const VIDEO_PORTRAIT_MINIMAL: MediaStreamConstraints = {
+  video: {
+    facingMode: 'user',
+  },
+  audio: AUDIO_FOR_VIDEO,
+};
+
 /** Legacy export — aspect + explicit dimensions (kept for any external use). */
 export const VIDEO_CONSTRAINTS: MediaStreamConstraints = {
   video: {
@@ -50,7 +83,7 @@ export const VIDEO_CONSTRAINTS: MediaStreamConstraints = {
   audio: AUDIO_FOR_VIDEO,
 };
 
-/** If portrait fails, typical HD landscape (last resort). */
+/** Desktop webcam last resort (landscape). Avoid on phones so clips stay portrait. */
 export const VIDEO_CONSTRAINTS_FALLBACK: MediaStreamConstraints = {
   video: {
     facingMode: 'user',
@@ -61,22 +94,44 @@ export const VIDEO_CONSTRAINTS_FALLBACK: MediaStreamConstraints = {
   audio: AUDIO_FOR_VIDEO,
 };
 
-/** Prefer portrait stream; several tries so recording still works everywhere. */
+function isLikelyPhoneOrTablet(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent,
+  );
+}
+
+/**
+ * Prefer portrait (phone upright). We no longer fall back to landscape HD on phones —
+ * that was forcing wide video. Desktop can still use landscape if nothing else works.
+ */
 export async function getFrontCameraStreamPortraitFirst(): Promise<MediaStream> {
-  const tries: MediaStreamConstraints[] = [
+  const portraitTries: MediaStreamConstraints[] = [
     VIDEO_PORTRAIT_ASPECT_ONLY,
     VIDEO_PORTRAIT_EXPLICIT,
+    VIDEO_PORTRAIT_HD,
     VIDEO_CONSTRAINTS,
-    VIDEO_CONSTRAINTS_FALLBACK,
+    VIDEO_PORTRAIT_ASPECT_RANGE,
+    VIDEO_PORTRAIT_MINIMAL,
   ];
+
   let lastErr: unknown;
-  for (const c of tries) {
+  for (const c of portraitTries) {
     try {
       return await navigator.mediaDevices.getUserMedia(c);
     } catch (e) {
       lastErr = e;
     }
   }
+
+  if (!isLikelyPhoneOrTablet()) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(VIDEO_CONSTRAINTS_FALLBACK);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
