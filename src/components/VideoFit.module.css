@@ -1,6 +1,5 @@
 /**
- * Playback box sized from video intrinsic dimensions (loadedmetadata) so clips
- * aren’t squashed; object-fit keeps letterboxing consistent.
+ * Guest playback: width-constrained; height follows intrinsic video + browser rotation handling.
  */
 .wrap {
   width: 100%;
@@ -14,14 +13,10 @@
 
 .video {
   width: 100%;
-  height: 100%;
+  height: auto;
+  max-height: min(78vh, 960px);
   display: block;
   object-fit: contain;
-}
-
-/* Before dimensions are known */
-.wrapPending {
-  min-height: 200px;
 }
 
 .guestRounded {

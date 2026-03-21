@@ -73,12 +73,21 @@ export default function GuestPage() {
     prompt: string;
     /** Filled optional host greeting, e.g. "Happy birthday, Ashley!" */
     celebrationLine: string | null;
-  }>(() => ({
-    a: fallbackDemoCouple.a,
-    b: fallbackDemoCouple.b,
-    prompt: fallbackDemoPrompt,
-    celebrationLine: null,
-  }));
+  }>(() =>
+    eventId === 'demo'
+      ? {
+          a: fallbackDemoCouple.a,
+          b: fallbackDemoCouple.b,
+          prompt: fallbackDemoPrompt,
+          celebrationLine: null,
+        }
+      : {
+          a: '',
+          b: '',
+          prompt: '',
+          celebrationLine: null,
+        },
+  );
 
   const [loadingEvent, setLoadingEvent] = useState(false);
   const [eventError, setEventError] = useState<string | null>(null);
@@ -704,19 +713,21 @@ export default function GuestPage() {
   return (
     <div className={styles.page}>
       <div className={styles.top}>
-        {couple.celebrationLine ? (
-          <div className={styles.celebrationHero} role="status" aria-label="Greeting">
-            {couple.celebrationLine}
-          </div>
-        ) : (
-          <div className={styles.coupleNames} aria-label="Couple names">
-            <span className={styles.coupleName}>{couple.a}</span>
-            {hasSecondName && <span className={styles.amp}>&</span>}
-            {hasSecondName && <span className={styles.coupleName}>{couple.b}</span>}
-          </div>
-        )}
+        {!(eventId !== 'demo' && loadingEvent) && (
+          <>
+            {couple.celebrationLine ? (
+              <div className={styles.celebrationHero} role="status" aria-label="Greeting">
+                {couple.celebrationLine}
+              </div>
+            ) : (
+              <div className={styles.coupleNames} aria-label="Couple names">
+                <span className={styles.coupleName}>{couple.a}</span>
+                {hasSecondName && <span className={styles.amp}>&</span>}
+                {hasSecondName && <span className={styles.coupleName}>{couple.b}</span>}
+              </div>
+            )}
 
-        <div className={styles.promptWrap}>
+            <div className={styles.promptWrap}>
           <div className={styles.promptHeadRow}>
             <div className={styles.promptLabel}>Prompt</div>
             {eventId !== 'demo' && promptTemplates.length > 1 && (
@@ -737,6 +748,8 @@ export default function GuestPage() {
           </div>
           <p className={styles.prompt}>&ldquo;{couple.prompt}&rdquo;</p>
         </div>
+          </>
+        )}
       </div>
 
       <div className={styles.options} role="group" aria-label="Message type">
@@ -798,21 +811,23 @@ export default function GuestPage() {
         <div className={styles.loadingBox}>Loading your event…</div>
       )}
 
-      <div className={styles.guestNameWrap}>
-        <label className={styles.guestNameLabel} htmlFor="guest-from">
-          This message is from <span className={styles.optional}>(optional)</span>
-        </label>
-        <input
-          id="guest-from"
-          className={styles.guestNameInput}
-          type="text"
-          value={guestName}
-          onChange={(e) => setGuestName(e.target.value)}
-          placeholder="Your name"
-          maxLength={80}
-          autoComplete="name"
-        />
-      </div>
+      {!showVideoFullscreen && (
+        <div className={styles.guestNameWrap}>
+          <label className={styles.guestNameLabel} htmlFor="guest-from">
+            This message is from <span className={styles.optional}>(optional)</span>
+          </label>
+          <input
+            id="guest-from"
+            className={styles.guestNameInput}
+            type="text"
+            value={guestName}
+            onChange={(e) => setGuestName(e.target.value)}
+            placeholder="Your name"
+            maxLength={80}
+            autoComplete="name"
+          />
+        </div>
+      )}
 
       <div
         className={`${styles.composer} ${showVideoFullscreen ? styles.composerHidden : ''}`}
@@ -842,13 +857,11 @@ export default function GuestPage() {
             ) : null}
             {!showVideoFullscreen && !videoPreviewUrl ? (
               <div className={styles.helpBox}>
-                <p className={styles.helpBoxLead}>
-                  Tap <strong>Record</strong> (up to {MAX_RECORDING_SECONDS} seconds).
-                </p>
-                <p className={styles.helpBoxSub}>
-                  If recording won&apos;t start, open <strong>Settings</strong> → <strong>Safari</strong> or{' '}
-                  <strong>Chrome</strong> → allow Camera and Microphone for this browser.
-                </p>
+                Tap <strong>Record</strong> (up to {MAX_RECORDING_SECONDS} seconds).
+                <br />
+                <br />
+                If recording won&apos;t start, open <strong>Settings</strong> → <strong>Safari</strong> or{' '}
+                <strong>Chrome</strong> → allow Camera and Microphone for this browser.
               </div>
             ) : null}
           </>
@@ -998,13 +1011,6 @@ export default function GuestPage() {
                   </>
                 )}
               </p>
-              <button
-                type="button"
-                className={styles.cancelOnDark}
-                onClick={cancelActiveVideoRecording}
-              >
-                {isRecording ? 'Cancel recording' : 'Cancel countdown'}
-              </button>
             </div>
           </div>
 

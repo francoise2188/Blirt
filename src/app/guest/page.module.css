@@ -206,11 +206,8 @@
 .helpBox {
   width: 100%;
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   border-radius: 14px;
   background: rgba(250, 248, 244, 0.75);
   border: 1px dashed rgba(21, 21, 21, 0.16);
@@ -218,20 +215,6 @@
   font-weight: 800;
   text-align: center;
   padding: 18px;
-}
-
-.helpBoxLead {
-  margin: 0;
-  line-height: 1.35;
-}
-
-.helpBoxSub {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 650;
-  line-height: 1.4;
-  color: rgba(21, 21, 21, 0.62);
-  max-width: 38ch;
 }
 
 .preview {
@@ -463,7 +446,7 @@
   object-fit: cover;
 }
 
-/* Full-screen camera: portrait frame; contain = show full field of view (no “zoomed in” crop). */
+/* Full-screen camera: portrait frame + cover (fills tall crop; avoids wide “landscape strip”). */
 .liveVideoFullscreen {
   min-height: 0;
   max-height: none;
@@ -471,7 +454,7 @@
   height: 100%;
   flex: none;
   max-width: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
   border-radius: 12px;
   background: #000;
@@ -520,10 +503,15 @@
   margin-right: auto;
 }
 
-/* Undo .liveVideo min-height so the portrait frame controls size */
 .videoFullScreenInner .liveVideo {
   min-height: 0;
   max-height: none;
+}
+
+/* Fullscreen mirror + slight scale so cover feels a bit less tight. */
+.videoFullScreenInner .liveVideoShell .liveVideo.liveVideoFullscreen.liveVideoMirror {
+  transform: scaleX(-1) scale(0.94);
+  transform-origin: center center;
 }
 
 .liveCaptionOnDark {
@@ -578,12 +566,6 @@
 /* Mirror selfie preview so it feels like a phone camera (recording file is unchanged). */
 .liveVideoMirror {
   transform: scaleX(-1);
-}
-
-/* Fullscreen only: combine mirror + slight zoom-out so preview doesn’t feel overly tight. */
-.videoFullScreenInner .liveVideoShell .liveVideo.liveVideoFullscreen.liveVideoMirror {
-  transform: scaleX(-1) scale(0.92);
-  transform-origin: center center;
 }
 
 .countdownOverlay {
