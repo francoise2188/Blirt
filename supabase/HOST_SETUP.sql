@@ -71,14 +71,14 @@ CREATE POLICY "blirts_insert_for_existing_event" ON blirts
     EXISTS (SELECT 1 FROM events e WHERE e.id = blirts.event_id)
   );
 
--- Hosts can read/update/delete blirts for events they own
+-- Hosts can read/update/delete blirts for events they own (match user_id or owner_id — same idea as Storage)
 DROP POLICY IF EXISTS "blirts_select_by_event_owner" ON blirts;
 CREATE POLICY "blirts_select_by_event_owner" ON blirts
   FOR SELECT TO authenticated
   USING (
     EXISTS (
       SELECT 1 FROM events e
-      WHERE e.id = blirts.event_id AND e.owner_id = auth.uid()
+      WHERE e.id = blirts.event_id AND (e.owner_id = auth.uid() OR e.user_id = auth.uid())
     )
   );
 
@@ -88,7 +88,7 @@ CREATE POLICY "blirts_update_by_event_owner" ON blirts
   USING (
     EXISTS (
       SELECT 1 FROM events e
-      WHERE e.id = blirts.event_id AND e.owner_id = auth.uid()
+      WHERE e.id = blirts.event_id AND (e.owner_id = auth.uid() OR e.user_id = auth.uid())
     )
   );
 
@@ -98,7 +98,7 @@ CREATE POLICY "blirts_delete_by_event_owner" ON blirts
   USING (
     EXISTS (
       SELECT 1 FROM events e
-      WHERE e.id = blirts.event_id AND e.owner_id = auth.uid()
+      WHERE e.id = blirts.event_id AND (e.owner_id = auth.uid() OR e.user_id = auth.uid())
     )
   );
 
