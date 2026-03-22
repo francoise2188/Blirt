@@ -13,6 +13,10 @@ import {
   svgQrToPngDataUrl,
 } from '../../../../lib/qrExport';
 import { buildBlirtsZip } from '../../../../lib/exportBlirtsZip';
+import {
+  friendlyBlirtStorageError,
+  normalizeBlirtMediaStoragePath,
+} from '../../../../lib/blirtsStoragePath';
 import { VideoFit } from '../../../../components/VideoFit';
 import { getPromptLibraryForEventType } from '../../../../lib/promptLibrary';
 import styles from '../../host.module.css';
@@ -175,10 +179,11 @@ export default function HostEventManagePage() {
       const nextErr: Record<string, string> = {};
       for (const b of blirts) {
         const t = (b.type || '').toLowerCase();
-        if ((t === 'video' || t === 'audio') && b.content.includes('/')) {
+        const mediaPath = normalizeBlirtMediaStoragePath(b.content);
+        if ((t === 'video' || t === 'audio') && mediaPath.includes('/')) {
           const { data, error } = await supabase.storage
             .from('blirts-media')
-            .createSignedUrl(b.content, 7200);
+            .createSignedUrl(mediaPath, 7200);
           if (error) {
             nextErr[b.id] = error.message;
           } else if (data?.signedUrl) {
@@ -204,8 +209,9 @@ export default function HostEventManagePage() {
     if (!ok) return;
     setBusyId(b.id);
     const t = (b.type || '').toLowerCase();
-    if ((t === 'video' || t === 'audio') && b.content.includes('/')) {
-      await supabase.storage.from('blirts-media').remove([b.content]);
+    const mediaPath = normalizeBlirtMediaStoragePath(b.content);
+    if ((t === 'video' || t === 'audio') && mediaPath.includes('/')) {
+      await supabase.storage.from('blirts-media').remove([mediaPath]);
     }
     await supabase.from('blirts').delete().eq('id', b.id);
     setBusyId(null);
@@ -229,8 +235,9 @@ export default function HostEventManagePage() {
       const paths: string[] = [];
       for (const b of items) {
         const t = (b.type || '').toLowerCase();
-        if ((t === 'video' || t === 'audio') && b.content.includes('/')) {
-          paths.push(b.content);
+        const mediaPath = normalizeBlirtMediaStoragePath(b.content);
+        if ((t === 'video' || t === 'audio') && mediaPath.includes('/')) {
+          paths.push(mediaPath);
         }
       }
       if (paths.length) {
@@ -334,10 +341,11 @@ export default function HostEventManagePage() {
         const t = (b.type || '').toLowerCase();
         let signed = '';
         let linkErr = '';
-        if ((t === 'video' || t === 'audio') && b.content.includes('/')) {
+        const mediaPath = normalizeBlirtMediaStoragePath(b.content);
+        if ((t === 'video' || t === 'audio') && mediaPath.includes('/')) {
           const { data, error } = await supabase.storage
             .from('blirts-media')
-            .createSignedUrl(b.content, 86400);
+            .createSignedUrl(mediaPath, 86400);
           if (error) linkErr = error.message;
           signed = data?.signedUrl ?? '';
         }
@@ -537,9 +545,11 @@ export default function HostEventManagePage() {
           </p>
           {Object.keys(mediaUrlErrors).length > 0 ? (
             <p className={styles.rlsHelpBanner} role="status">
-              Some media links failed (usually Supabase Storage permissions). Your files are still stored — run the
-              SQL script <code className={styles.inlineCode}>supabase/RLS_FIX_LOADING_AND_GUEST_UPLOAD.sql</code> in the
-              Supabase SQL Editor, then refresh this page.
+              Some media could not be opened. <strong>Object not found</strong> means there is no file in Storage for
+              that row (upload failed before the fix) — you can delete those entries. Other errors are often
+              permissions — run{' '}
+              <code className={styles.inlineCode}>supabase/RLS_FIX_LOADING_AND_GUEST_UPLOAD.sql</code> in Supabase (full
+              script, section F adds guest cleanup), then refresh.
             </p>
           ) : null}
           <div className={styles.exportRow}>
@@ -653,7 +663,7 @@ export default function HostEventManagePage() {
                         }
                       >
                         {mediaUrlErrors[b.id]
-                          ? `Can't load: ${mediaUrlErrors[b.id]}`
+                          ? `Can't load: ${friendlyBlirtStorageError(mediaUrlErrors[b.id])}`
                           : url
                             ? 'Video — tap to play'
                             : 'Loading…'}
@@ -666,7 +676,7 @@ export default function HostEventManagePage() {
                         }
                       >
                         {mediaUrlErrors[b.id]
-                          ? `Can't load: ${mediaUrlErrors[b.id]}`
+                          ? `Can't load: ${friendlyBlirtStorageError(mediaUrlErrors[b.id])}`
                           : url
                             ? 'Voice note — tap to play'
                             : 'Loading…'}
@@ -750,9 +760,7 @@ export default function HostEventManagePage() {
               if (viewerMediaError) {
                 return (
                   <p className={styles.mediaErrorHint}>
-                    Could not load media: {viewerMediaError}. Run{' '}
-                    <code className={styles.inlineCode}>supabase/RLS_FIX_LOADING_AND_GUEST_UPLOAD.sql</code> in Supabase,
-                    then refresh.
+                    {friendlyBlirtStorageError(viewerMediaError)}
                   </p>
                 );
               }

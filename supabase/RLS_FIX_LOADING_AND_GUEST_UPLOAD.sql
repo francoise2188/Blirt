@@ -6,7 +6,9 @@
 -- 2) Guests see "new row violates row-level security policy" on upload —
 --    Storage bucket needs an INSERT policy for anonymous uploads into event folders.
 --
--- Your files are NOT deleted; fixing policies restores access.
+-- "Object not found" in the host inbox means the DB row exists but no file was stored (upload
+-- failed while the old app still inserted the row first). Those clips cannot be recovered from
+-- Storage. New submissions use upload-then-insert so this does not repeat.
 -- =============================================================================
 
 -- A) Link owner_id from user_id where missing (safe if both columns exist)
@@ -73,6 +75,18 @@ CREATE POLICY "blirts_media_update_guest" ON storage.objects
     )
   )
   WITH CHECK (
+    bucket_id = 'blirts-media'
+    AND EXISTS (
+      SELECT 1 FROM events e
+      WHERE e.id::text = split_part(name, '/', 1)
+    )
+  );
+
+-- F) Guests can delete objects under an event folder (cleanup if DB insert fails after upload)
+DROP POLICY IF EXISTS "blirts_media_delete_guest" ON storage.objects;
+CREATE POLICY "blirts_media_delete_guest" ON storage.objects
+  FOR DELETE TO anon, authenticated
+  USING (
     bucket_id = 'blirts-media'
     AND EXISTS (
       SELECT 1 FROM events e

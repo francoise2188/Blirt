@@ -158,6 +158,17 @@ CREATE POLICY "blirts_media_update_guest" ON storage.objects
     )
   );
 
+DROP POLICY IF EXISTS "blirts_media_delete_guest" ON storage.objects;
+CREATE POLICY "blirts_media_delete_guest" ON storage.objects
+  FOR DELETE TO anon, authenticated
+  USING (
+    bucket_id = 'blirts-media'
+    AND EXISTS (
+      SELECT 1 FROM events e
+      WHERE e.id::text = split_part(name, '/', 1)
+    )
+  );
+
 -- 5) Supabase Dashboard → Authentication → URL configuration
 --    Add Site URL and Redirect URLs, e.g.:
 --    http://localhost:3001/auth/callback

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { normalizeBlirtMediaStoragePath } from './blirtsStoragePath';
 
 type BlirtRow = {
   id: string;
@@ -38,15 +39,16 @@ export async function buildBlirtsZip(params: {
       continue;
     }
 
-    if ((t === 'video' || t === 'audio') && b.content.includes('/')) {
+    const mediaPath = normalizeBlirtMediaStoragePath(b.content);
+    if ((t === 'video' || t === 'audio') && mediaPath.includes('/')) {
       const { data, error } = await params.supabase.storage
         .from('blirts-media')
-        .createSignedUrl(b.content, 7200);
+        .createSignedUrl(mediaPath, 7200);
       if (error || !data?.signedUrl) {
         skipped.push(`${b.id}: ${error?.message ?? 'no signed URL'}`);
         folder?.file(
           `MISSING-${t}-${b.id.slice(0, 8)}.txt`,
-          `Could not download this file.\nPath: ${b.content}\n${error?.message ?? ''}`,
+          `Could not download this file.\nPath: ${mediaPath}\n${error?.message ?? ''}`,
         );
         continue;
       }
@@ -57,7 +59,7 @@ export async function buildBlirtsZip(params: {
           continue;
         }
         const blob = await res.blob();
-        const ext = b.content.includes('.') ? (b.content.split('.').pop() ?? 'bin') : t === 'video' ? 'mp4' : 'm4a';
+        const ext = mediaPath.includes('.') ? (mediaPath.split('.').pop() ?? 'bin') : t === 'video' ? 'mp4' : 'm4a';
         const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext : t === 'video' ? 'mp4' : 'm4a';
         folder?.file(`${t}-${b.id.slice(0, 8)}.${safeExt}`, blob);
         const prompt = (b.prompt_snapshot ?? '').trim();

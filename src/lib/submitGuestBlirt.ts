@@ -49,6 +49,17 @@ export async function submitGuestMediaBlirt(
   const guestName = params.guestName?.trim() || null;
   const promptSnapshot = params.promptSnapshot?.trim() || null;
 
+  // Upload first so we never leave a blirts row pointing at a missing path if upload fails (RLS, etc.).
+  const { error: upErr } = await supabase.storage.from('blirts-media').upload(path, params.file, {
+    cacheControl: '3600',
+    upsert: true,
+    contentType,
+  });
+
+  if (upErr) {
+    return { error: upErr.message };
+  }
+
   const { error: insErr } = await supabase.from('blirts').insert({
     id,
     event_id: params.eventId,
@@ -60,18 +71,8 @@ export async function submitGuestMediaBlirt(
   });
 
   if (insErr) {
+    await supabase.storage.from('blirts-media').remove([path]);
     return { error: insErr.message };
-  }
-
-  const { error: upErr } = await supabase.storage.from('blirts-media').upload(path, params.file, {
-    cacheControl: '3600',
-    upsert: true,
-    contentType,
-  });
-
-  if (upErr) {
-    await supabase.from('blirts').delete().eq('id', id);
-    return { error: upErr.message };
   }
 
   return { error: null };
