@@ -400,6 +400,9 @@ export default function GuestPage() {
 
   const bigButtonLabel = useMemo(() => {
     if (submitted) return 'Sent!';
+    if (isSubmitting) {
+      return mode === 'text' ? 'Sending…' : 'Uploading…';
+    }
     if (mode === 'text') return 'Submit';
     if (countdown !== null) return 'Cancel';
     if (mode === 'video') {
@@ -408,7 +411,7 @@ export default function GuestPage() {
     }
     if (isRecording) return 'Stop';
     return audioFile ? 'Submit' : 'Record';
-  }, [audioFile, countdown, isRecording, mode, submitted, videoFile]);
+  }, [audioFile, countdown, isRecording, isSubmitting, mode, submitted, videoFile]);
 
   const stopVideoRecording = useCallback(async () => {
     const live = liveRecordingRef.current;
@@ -524,6 +527,27 @@ export default function GuestPage() {
       document.body.style.overflow = prev;
     };
   }, [showVideoFullscreen]);
+
+  const showSubmitBlocking = isSubmitting && !submitted;
+
+  useEffect(() => {
+    if (!showSubmitBlocking) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showSubmitBlocking]);
+
+  useEffect(() => {
+    if (!showSubmitBlocking) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [showSubmitBlocking]);
 
   const handleBigButtonClick = async () => {
     if (submitted) return;
@@ -1120,6 +1144,26 @@ export default function GuestPage() {
           </button>
         </div>
       )}
+
+      {showSubmitBlocking ? (
+        <div
+          className={styles.submitBlockingOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-live="polite"
+          aria-busy="true"
+          aria-label={mode === 'text' ? 'Sending message' : 'Uploading media'}
+        >
+          <div className={styles.submitBlockingSpinner} aria-hidden />
+          <p className={styles.submitBlockingTitle}>
+            {mode === 'text' ? 'Sending your message…' : 'Uploading your clip…'}
+          </p>
+          <p className={styles.submitBlockingSub}>
+            Please wait and keep this page open until you see &ldquo;Your Blirt is in.&rdquo; Closing the page too
+            early can stop the upload.
+          </p>
+        </div>
+      ) : null}
 
       <div className={styles.bottomWordmark} aria-hidden="true">
         Blirt

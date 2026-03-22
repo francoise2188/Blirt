@@ -766,3 +766,53 @@
   border: 1px solid rgba(200, 140, 40, 0.25);
 }
 
+/* Full-screen while video/audio uploads or text sends — keeps guests from leaving mid-upload. */
+.submitBlockingOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+  background: rgba(250, 248, 244, 0.96);
+  backdrop-filter: blur(10px);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.submitBlockingSpinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid rgba(21, 21, 21, 0.1);
+  border-top-color: var(--accent);
+  animation: submitBlockingSpin 0.75s linear infinite;
+}
+
+@keyframes submitBlockingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.submitBlockingTitle {
+  margin: 0;
+  font-size: clamp(20px, 5vw, 24px);
+  font-weight: 900;
+  line-height: 1.25;
+  color: rgba(21, 21, 21, 0.92);
+  max-width: 340px;
+}
+
+.submitBlockingSub {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.45;
+  color: rgba(21, 21, 21, 0.65);
+  max-width: 320px;
+}
+
