@@ -111,7 +111,7 @@ CREATE POLICY "blirts_media_select_owner" ON storage.objects
     bucket_id = 'blirts-media'
     AND EXISTS (
       SELECT 1 FROM events e
-      WHERE e.owner_id = auth.uid()
+      WHERE (e.owner_id = auth.uid() OR e.user_id = auth.uid())
         AND name LIKE (e.id::text || '/%')
     )
   );
@@ -123,8 +123,38 @@ CREATE POLICY "blirts_media_delete_owner" ON storage.objects
     bucket_id = 'blirts-media'
     AND EXISTS (
       SELECT 1 FROM events e
-      WHERE e.owner_id = auth.uid()
+      WHERE (e.owner_id = auth.uid() OR e.user_id = auth.uid())
         AND name LIKE (e.id::text || '/%')
+    )
+  );
+
+-- Guests upload into blirts-media/{eventId}/{filename} — required or uploads get RLS errors.
+DROP POLICY IF EXISTS "blirts_media_insert_guest" ON storage.objects;
+CREATE POLICY "blirts_media_insert_guest" ON storage.objects
+  FOR INSERT TO anon, authenticated
+  WITH CHECK (
+    bucket_id = 'blirts-media'
+    AND EXISTS (
+      SELECT 1 FROM events e
+      WHERE e.id::text = split_part(name, '/', 1)
+    )
+  );
+
+DROP POLICY IF EXISTS "blirts_media_update_guest" ON storage.objects;
+CREATE POLICY "blirts_media_update_guest" ON storage.objects
+  FOR UPDATE TO anon, authenticated
+  USING (
+    bucket_id = 'blirts-media'
+    AND EXISTS (
+      SELECT 1 FROM events e
+      WHERE e.id::text = split_part(name, '/', 1)
+    )
+  )
+  WITH CHECK (
+    bucket_id = 'blirts-media'
+    AND EXISTS (
+      SELECT 1 FROM events e
+      WHERE e.id::text = split_part(name, '/', 1)
     )
   );
 

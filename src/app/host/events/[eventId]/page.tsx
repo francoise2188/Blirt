@@ -77,6 +77,8 @@ export default function HostEventManagePage() {
 
   const [blirts, setBlirts] = useState<BlirtRow[]>([]);
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
+  /** When signed URL fails (e.g. Storage RLS), we show the error instead of endless "Loading…". */
+  const [mediaUrlErrors, setMediaUrlErrors] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [viewerBlirt, setViewerBlirt] = useState<BlirtRow | null>(null);
@@ -164,21 +166,32 @@ export default function HostEventManagePage() {
   useEffect(() => {
     if (!supabase || !blirts.length) {
       setMediaUrls({});
+      setMediaUrlErrors({});
       return;
     }
     let cancelled = false;
     (async () => {
       const next: Record<string, string> = {};
+      const nextErr: Record<string, string> = {};
       for (const b of blirts) {
         const t = (b.type || '').toLowerCase();
         if ((t === 'video' || t === 'audio') && b.content.includes('/')) {
-          const { data } = await supabase.storage
+          const { data, error } = await supabase.storage
             .from('blirts-media')
             .createSignedUrl(b.content, 7200);
-          if (data?.signedUrl) next[b.id] = data.signedUrl;
+          if (error) {
+            nextErr[b.id] = error.message;
+          } else if (data?.signedUrl) {
+            next[b.id] = data.signedUrl;
+          } else {
+            nextErr[b.id] = 'No download link returned.';
+          }
         }
       }
-      if (!cancelled) setMediaUrls(next);
+      if (!cancelled) {
+        setMediaUrls(next);
+        setMediaUrlErrors(nextErr);
+      }
     })();
     return () => {
       cancelled = true;
@@ -424,6 +437,7 @@ export default function HostEventManagePage() {
   );
 
   const viewerUrl = viewerBlirt ? mediaUrls[viewerBlirt.id] : undefined;
+  const viewerMediaError = viewerBlirt ? mediaUrlErrors[viewerBlirt.id] : undefined;
 
   function togglePoolPrompt(text: string) {
     setPromptStatus(null);
@@ -521,6 +535,13 @@ export default function HostEventManagePage() {
             <strong>CSV</strong> = spreadsheet with text plus <strong>clickable links</strong> to video/audio (not the video files themselves).{' '}
             <strong>ZIP</strong> = downloads the actual video, voice, and text files.
           </p>
+          {Object.keys(mediaUrlErrors).length > 0 ? (
+            <p className={styles.rlsHelpBanner} role="status">
+              Some media links failed (usually Supabase Storage permissions). Your files are still stored — run the
+              SQL script <code className={styles.inlineCode}>supabase/RLS_FIX_LOADING_AND_GUEST_UPLOAD.sql</code> in the
+              Supabase SQL Editor, then refresh this page.
+            </p>
+          ) : null}
           <div className={styles.exportRow}>
             <button
               type="button"
@@ -626,18 +647,34 @@ export default function HostEventManagePage() {
                       <div className={styles.blirtPreviewText}>{b.content}</div>
                     )}
                     {t === 'video' && (
-                      <div className={styles.blirtPreviewHint}>
-                        {url ? 'Video — tap to play' : 'Loading…'}
+                      <div
+                        className={
+                          mediaUrlErrors[b.id] ? styles.mediaErrorHint : styles.blirtPreviewHint
+                        }
+                      >
+                        {mediaUrlErrors[b.id]
+                          ? `Can't load: ${mediaUrlErrors[b.id]}`
+                          : url
+                            ? 'Video — tap to play'
+                            : 'Loading…'}
                       </div>
                     )}
                     {t === 'audio' && (
-                      <div className={styles.blirtPreviewHint}>
-                        {url ? 'Voice note — tap to play' : 'Loading…'}
+                      <div
+                        className={
+                          mediaUrlErrors[b.id] ? styles.mediaErrorHint : styles.blirtPreviewHint
+                        }
+                      >
+                        {mediaUrlErrors[b.id]
+                          ? `Can't load: ${mediaUrlErrors[b.id]}`
+                          : url
+                            ? 'Voice note — tap to play'
+                            : 'Loading…'}
                       </div>
                     )}
                   </button>
                   <div className={styles.blirtRowActions}>
-                    {(t === 'video' || t === 'audio') && url && (
+                    {(t === 'video' || t === 'audio') && url && !mediaUrlErrors[b.id] && (
                       <a
                         className={styles.link}
                         href={url}
@@ -710,6 +747,15 @@ export default function HostEventManagePage() {
                   </div>
                 );
               }
+              if (viewerMediaError) {
+                return (
+                  <p className={styles.mediaErrorHint}>
+                    Could not load media: {viewerMediaError}. Run{' '}
+                    <code className={styles.inlineCode}>supabase/RLS_FIX_LOADING_AND_GUEST_UPLOAD.sql</code> in Supabase,
+                    then refresh.
+                  </p>
+                );
+              }
               if (vt === 'video' && viewerUrl) {
                 return <VideoFit src={viewerUrl} variant="modal" />;
               }
@@ -718,7 +764,7 @@ export default function HostEventManagePage() {
               }
               return <p className={styles.muted}>Loading media…</p>;
             })()}
-            {viewerUrl && (viewerBlirt.type || '').toLowerCase() !== 'text' && (
+            {viewerUrl && (viewerBlirt.type || '').toLowerCase() !== 'text' && !viewerMediaError && (
               <a
                 className={styles.link}
                 href={viewerUrl}
