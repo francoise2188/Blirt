@@ -20,7 +20,7 @@
 }
 
 .coupleNames {
-  font-family: var(--font-blirt, cursive);
+  font-family: var(--font-blirt, 'Fraunces', Georgia, serif);
   font-size: clamp(40px, 8vw, 56px);
   line-height: 0.95;
   letter-spacing: -0.02em;
@@ -107,11 +107,25 @@
   font-weight: 650;
 }
 
+.promptCaret {
+  display: inline-block;
+  margin-left: 1px;
+  opacity: 0.55;
+  font-weight: 400;
+  animation: promptCaretBlink 0.9s step-end infinite;
+}
+
+@keyframes promptCaretBlink {
+  50% {
+    opacity: 0;
+  }
+}
+
 /* Host optional greeting — top headline (same scale as names when no greeting) */
 .celebrationHero {
   width: 100%;
   text-align: center;
-  font-family: var(--font-blirt, cursive);
+  font-family: var(--font-blirt, 'Fraunces', Georgia, serif);
   font-size: clamp(40px, 8vw, 56px);
   line-height: 0.95;
   letter-spacing: -0.02em;
@@ -203,18 +217,74 @@
   display: none;
 }
 
-.helpBox {
+/* Idle video/audio: drop the tall composer card — hints live above the Record button. */
+.composerMediaIdle {
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  backdrop-filter: none;
+  overflow: hidden;
+}
+
+.recordCtaStack {
   width: 100%;
-  flex: 1;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: rgba(250, 248, 244, 0.75);
-  border: 1px dashed rgba(21, 21, 21, 0.16);
-  color: rgba(21, 21, 21, 0.72);
-  font-weight: 800;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.recordPrimaryHint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
   text-align: center;
-  padding: 18px;
+  font-weight: 650;
+  color: rgba(21, 21, 21, 0.48);
+}
+
+.recordingTroubleWrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.recordingTroubleLink {
+  appearance: none;
+  border: none;
+  margin: 0;
+  padding: 4px 8px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 650;
+  color: rgba(21, 21, 21, 0.48);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  touch-action: manipulation;
+  font-family: inherit;
+}
+
+.recordingTroubleLink:active {
+  opacity: 0.75;
+}
+
+.recordingTroublePanel {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 650;
+  color: rgba(21, 21, 21, 0.72);
+  text-align: left;
+  border-radius: 10px;
+  background: rgba(250, 248, 244, 0.55);
 }
 
 .preview {
@@ -338,7 +408,7 @@
 .bottomWordmark {
   margin-top: auto;
   padding-top: 10px;
-  font-family: var(--font-blirt, cursive);
+  font-family: var(--font-blirt, 'Fraunces', Georgia, serif);
   font-size: 22px;
   opacity: 0.6;
 }

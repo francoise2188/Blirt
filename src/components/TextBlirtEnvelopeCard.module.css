@@ -1,0 +1,299 @@
+/* Text Blirt envelope — host inbox (chartreuse #B5CC2E, cream #FAF8F4, ink #1a1a1a) */
+
+.wrap {
+  width: 100%;
+  text-align: left;
+}
+
+/* Sealed — crisp white card, flat envelope graphic */
+.sealedButton {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(26, 26, 26, 0.1);
+  border-radius: 14px;
+  background: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sealedButton:hover {
+  border-color: rgba(181, 204, 46, 0.45);
+  box-shadow: 0 6px 20px rgba(26, 26, 26, 0.05);
+}
+
+.sealedButton:focus-visible {
+  outline: 2px solid #b5cc2e;
+  outline-offset: 2px;
+}
+
+.iconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.meta {
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(26, 26, 26, 0.72);
+}
+
+.meta strong {
+  color: #1a1a1a;
+  font-weight: 700;
+}
+
+.meta time {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.55;
+}
+
+.viewedLabel {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: rgba(26, 26, 26, 0.38);
+}
+
+.hint {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(26, 26, 26, 0.4);
+}
+
+/* —— Open stage —— */
+
+.openRoot {
+  margin-top: 0;
+  padding: 0;
+  border: 1px solid rgba(26, 26, 26, 0.1);
+  border-radius: 14px;
+  background: #fafafa;
+  overflow: hidden;
+}
+
+/* Let clicks reach the footer: 3D flap can otherwise stack above it and steal hits */
+.scene {
+  position: relative;
+  z-index: 0;
+  perspective: 960px;
+  perspective-origin: 50% 0%;
+  transform-style: preserve-3d;
+  padding: 16px 16px 0;
+  pointer-events: none;
+}
+
+.pocket {
+  position: relative;
+  min-height: 128px;
+  border-radius: 10px 10px 0 0;
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-bottom: none;
+  overflow: visible;
+  transform-style: preserve-3d;
+}
+
+/* Top-hinged flap: triangle points DOWN (sealed over opening). Opens by folding UP and BACK (negative rotateX). */
+.flap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 52%;
+  transform-origin: 50% 0%;
+  transform: rotateX(0deg);
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.flapInner {
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+  border: 1px solid #e8e8e8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.flapShade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(26, 26, 26, 0.07) 0%,
+    transparent 50%
+  );
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+  pointer-events: none;
+}
+
+/* After flap lifts, tuck it behind the paper */
+.flapBehind {
+  z-index: 1;
+}
+
+.sceneInstant .flap {
+  transform: rotateX(-172deg);
+  transition: none;
+  z-index: 1;
+}
+
+.scenePlay .flap {
+  animation: flapLift 0.74s cubic-bezier(0.33, 0.86, 0.36, 1) forwards;
+}
+
+@keyframes flapLift {
+  from {
+    transform: rotateX(0deg);
+  }
+  to {
+    transform: rotateX(-172deg);
+  }
+}
+
+.letter {
+  position: relative;
+  z-index: 2;
+  margin: 32px 14px 0;
+  padding: 0;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.letterSheet {
+  position: relative;
+  padding: 26px 28px 28px;
+  border-radius: 12px;
+  background: #faf8f4;
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  box-shadow:
+    0 2px 4px rgba(26, 26, 26, 0.04),
+    0 12px 36px rgba(26, 26, 26, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.85) inset;
+}
+
+.letterSheet::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.14;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E");
+}
+
+.sceneInstant .letter {
+  transform: translateY(0);
+}
+
+.scenePlay .letter {
+  transform: translateY(78%);
+  animation: letterRise 0.64s cubic-bezier(0.33, 1, 0.32, 1) 0.4s forwards;
+}
+
+@keyframes letterRise {
+  from {
+    transform: translateY(78%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.prompt {
+  font-size: 11px;
+  line-height: 1.5;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(26, 26, 26, 0.38);
+  margin: 0 0 14px;
+}
+
+.prompt span {
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.body {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #1a1a1a;
+  white-space: pre-wrap;
+  font-family: var(--font-ui, 'DM Sans', system-ui, sans-serif);
+}
+
+.footer {
+  position: relative;
+  z-index: 4;
+  padding: 16px 18px 18px;
+  background: rgba(250, 248, 244, 0.85);
+  border-top: 1px solid rgba(26, 26, 26, 0.06);
+  pointer-events: auto;
+}
+
+.foldBackLink {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #b5cc2e;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, filter 0.15s ease;
+}
+
+.foldBackLink:hover {
+  color: #9eb528;
+  filter: brightness(0.97);
+}
+
+.foldBackLink:focus-visible {
+  outline: 2px solid rgba(181, 204, 46, 0.65);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.statusPill {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(26, 26, 26, 0.06);
+  color: rgba(26, 26, 26, 0.65);
+}

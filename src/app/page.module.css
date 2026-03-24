@@ -17,7 +17,7 @@
 }
 
 .wordmark {
-  font-family: var(--font-blirt, cursive);
+  font-family: var(--font-blirt, 'Fraunces', Georgia, serif);
   font-size: 48px;
   line-height: 1;
   letter-spacing: -0.02em;

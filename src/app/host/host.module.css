@@ -3,7 +3,7 @@
   padding: 24px 16px 40px;
   max-width: 900px;
   margin: 0 auto;
-  font-family: var(--font-ui, system-ui, sans-serif);
+  font-family: var(--font-ui, 'DM Sans', system-ui, sans-serif);
 }
 
 .topBar {
@@ -16,7 +16,7 @@
 }
 
 .brand {
-  font-family: var(--font-blirt, cursive);
+  font-family: var(--font-blirt, 'Fraunces', Georgia, serif);
   font-size: 28px;
   font-weight: 700;
 }
@@ -58,6 +58,50 @@
   letter-spacing: 0.12em;
   margin: 0 0 10px;
   opacity: 0.7;
+}
+
+/* Inbox: title + "Manage collection" — tools live in the expandable panel */
+.blirtsInboxHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.blirtsInboxTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: inherit;
+}
+
+.collectionManageToggle {
+  flex-shrink: 0;
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 4px 0 4px 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.collectionManageToggle:hover {
+  opacity: 0.85;
+}
+
+.collectionManagePanel {
+  margin-bottom: 16px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-top: 1px solid rgba(21, 21, 21, 0.08);
 }
 
 .label {
@@ -192,8 +236,21 @@
   border-radius: 10px;
 }
 
+/* Text Blirt envelope sits below the meta line (non-button row) */
+.blirtRowTextBody {
+  margin-top: 10px;
+  width: 100%;
+  min-width: 0;
+  cursor: default;
+}
+
 .blirtRowMain:hover .blirtMeta {
   opacity: 0.95;
+}
+
+/* Text row uses envelope UI instead of a single clickable preview */
+.blirtRowMainEnvelopeHost {
+  cursor: default;
 }
 
 .blirtRowActions {

@@ -8,16 +8,29 @@ import type { User } from '@supabase/supabase-js';
 import { supabase } from '../../../../lib/supabaseClient';
 import { getGuestPageUrl } from '../../../../lib/guestUrl';
 import {
+  defaultGuestSlug,
+  isReservedGuestSlug,
+  normalizeGuestSlugInput,
+} from '../../../../lib/guestSlug';
+import {
   downloadPngDataUrl,
   openQrPrintSheet,
   svgQrToPngDataUrl,
 } from '../../../../lib/qrExport';
+import {
+  buildBlirtsCollectionPdf,
+  collectionPdfFilename,
+} from '../../../../lib/exportBlirtsCollectionPdf';
 import { buildBlirtsZip } from '../../../../lib/exportBlirtsZip';
 import {
   friendlyBlirtStorageError,
   normalizeBlirtMediaStoragePath,
 } from '../../../../lib/blirtsStoragePath';
 import { VideoFit } from '../../../../components/VideoFit';
+import {
+  TextBlirtEnvelopeCard,
+  type EnvelopeVariant,
+} from '../../../../components/TextBlirtEnvelopeCard';
 import { getPromptLibraryForEventType } from '../../../../lib/promptLibrary';
 import styles from '../../host.module.css';
 
@@ -27,6 +40,8 @@ type EventRow = {
   id: string;
   partner_1: string | null;
   partner_2: string | null;
+  /** Pretty guest path: /ashley-birthday */
+  guest_slug?: string | null;
   event_type?: string | null;
   prompts: string[] | null;
   prompt_randomize: boolean | null;
@@ -67,6 +82,72 @@ function displayEventNames(a: string | null, b: string | null) {
   return 'Untitled event';
 }
 
+const ENVELOPE_OPEN_STORAGE = 'blirt-env-opened-v1';
+
+function loadEnvelopeOpenedIds(eventId: string): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(`${ENVELOPE_OPEN_STORAGE}:${eventId}`);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as string[];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveEnvelopeOpenedIds(eventId: string, ids: Set<string>) {
+  try {
+    localStorage.setItem(`${ENVELOPE_OPEN_STORAGE}:${eventId}`, JSON.stringify([...ids]));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+const TEXT_VIEWED_STORAGE = 'blirt-text-viewed-v1';
+
+function loadTextViewedIds(eventId: string): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(`${TEXT_VIEWED_STORAGE}:${eventId}`);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as string[];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveTextViewedIds(eventId: string, ids: Set<string>) {
+  try {
+    localStorage.setItem(`${TEXT_VIEWED_STORAGE}:${eventId}`, JSON.stringify([...ids]));
+  } catch {
+    /* ignore */
+  }
+}
+
+function textBlirtHasBeenViewed(b: BlirtRow, viewedIds: Set<string>): boolean {
+  const st = (b.status ?? '').toLowerCase();
+  if (st === 'kept' || st === 'skipped') return true;
+  return viewedIds.has(b.id);
+}
+
+function envelopeVariantFor(
+  b: BlirtRow,
+  openIds: Set<string>,
+  playId: string | null,
+  collapsedIds: Set<string>,
+): EnvelopeVariant {
+  const t = (b.type || '').toLowerCase();
+  if (t !== 'text') return 'sealed';
+  if (collapsedIds.has(b.id)) return 'sealed';
+  const st = (b.status ?? '').toLowerCase();
+  const open = openIds.has(b.id) || st === 'kept' || st === 'skipped';
+  if (!open) return 'sealed';
+  if (playId === b.id) return 'open-animated';
+  return 'open-instant';
+}
+
 export default function HostEventManagePage() {
   const params = useParams();
   const router = useRouter();
@@ -85,7 +166,13 @@ export default function HostEventManagePage() {
   const [mediaUrlErrors, setMediaUrlErrors] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  /** Inbox: export/delete/help hidden until "Manage collection" is opened. */
+  const [collectionToolsOpen, setCollectionToolsOpen] = useState(false);
   const [viewerBlirt, setViewerBlirt] = useState<BlirtRow | null>(null);
+  const [openEnvelopeIds, setOpenEnvelopeIds] = useState<Set<string>>(() => new Set());
+  const [envelopeCollapsedIds, setEnvelopeCollapsedIds] = useState<Set<string>>(() => new Set());
+  const [envelopePlayId, setEnvelopePlayId] = useState<string | null>(null);
+  const [viewedTextEnvelopeIds, setViewedTextEnvelopeIds] = useState<Set<string>>(() => new Set());
 
   /** All selected prompt lines saved to events.prompts */
   const [promptPool, setPromptPool] = useState<string[]>([]);
@@ -95,11 +182,19 @@ export default function HostEventManagePage() {
 
   const [exporting, setExporting] = useState(false);
   const [zipExporting, setZipExporting] = useState(false);
+  const [pdfExporting, setPdfExporting] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [qrBusy, setQrBusy] = useState(false);
   const qrWrapRef = useRef<HTMLDivElement | null>(null);
 
-  const guestUrl = useMemo(() => getGuestPageUrl(eventId), [eventId]);
+  const [slugDraft, setSlugDraft] = useState('');
+  const [slugSaving, setSlugSaving] = useState(false);
+  const [slugStatus, setSlugStatus] = useState<string | null>(null);
+
+  const guestUrl = useMemo(
+    () => getGuestPageUrl(eventId, { guestSlug: event?.guest_slug ?? null }),
+    [eventId, event?.guest_slug],
+  );
   const eventTitleForFiles = useMemo(
     () => displayEventNames(event?.partner_1 ?? null, event?.partner_2 ?? null),
     [event?.partner_1, event?.partner_2],
@@ -147,6 +242,8 @@ export default function HostEventManagePage() {
         return;
       }
       setEvent(ev);
+      setSlugDraft((ev.guest_slug ?? '').trim());
+      setSlugStatus(null);
       const existing = (Array.isArray(ev.prompts) ? ev.prompts : [])
         .map((s) => String(s).trim())
         .filter(Boolean);
@@ -158,6 +255,50 @@ export default function HostEventManagePage() {
   useEffect(() => {
     loadBlirts();
   }, [loadBlirts]);
+
+  useEffect(() => {
+    if (!eventId) return;
+    setOpenEnvelopeIds(loadEnvelopeOpenedIds(eventId));
+    const opened = loadEnvelopeOpenedIds(eventId);
+    const viewed = loadTextViewedIds(eventId);
+    const merged = new Set<string>([...viewed, ...opened]);
+    setViewedTextEnvelopeIds(merged);
+    if (merged.size > viewed.size) {
+      saveTextViewedIds(eventId, merged);
+    }
+  }, [eventId]);
+
+  useEffect(() => {
+    setOpenEnvelopeIds((prev) => {
+      const next = new Set(prev);
+      for (const b of blirts) {
+        const t = (b.type || '').toLowerCase();
+        const st = (b.status ?? '').toLowerCase();
+        if (t === 'text' && (st === 'kept' || st === 'skipped')) {
+          next.add(b.id);
+        }
+      }
+      return next;
+    });
+  }, [blirts]);
+
+  useEffect(() => {
+    if (!eventId) return;
+    setViewedTextEnvelopeIds((prev) => {
+      const next = new Set(prev);
+      for (const b of blirts) {
+        const t = (b.type || '').toLowerCase();
+        const st = (b.status ?? '').toLowerCase();
+        if (t === 'text' && (st === 'kept' || st === 'skipped')) {
+          next.add(b.id);
+        }
+      }
+      if (next.size !== prev.size) {
+        saveTextViewedIds(eventId, next);
+      }
+      return next;
+    });
+  }, [blirts, eventId]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -203,9 +344,60 @@ export default function HostEventManagePage() {
     };
   }, [blirts]);
 
-  async function deleteBlirt(b: BlirtRow) {
+  function toggleTextEnvelope(b: BlirtRow) {
+    const t = (b.type || '').toLowerCase();
+    if (t !== 'text') return;
+    const st = (b.status ?? '').toLowerCase();
+    const pending = st === 'pending' || !st || st === '';
+    const expanded =
+      !envelopeCollapsedIds.has(b.id) &&
+      (openEnvelopeIds.has(b.id) || st === 'kept' || st === 'skipped');
+
+    if (expanded) {
+      if (pending) {
+        setOpenEnvelopeIds((prev) => {
+          const next = new Set(prev);
+          next.delete(b.id);
+          if (eventId) saveEnvelopeOpenedIds(eventId, next);
+          return next;
+        });
+      } else {
+        setEnvelopeCollapsedIds((prev) => {
+          const next = new Set(prev);
+          next.add(b.id);
+          return next;
+        });
+      }
+      return;
+    }
+
+    setEnvelopeCollapsedIds((prev) => {
+      if (!prev.has(b.id)) return prev;
+      const next = new Set(prev);
+      next.delete(b.id);
+      return next;
+    });
+    setEnvelopePlayId(b.id);
+    setOpenEnvelopeIds((prev) => {
+      const next = new Set(prev);
+      next.add(b.id);
+      if (eventId) saveEnvelopeOpenedIds(eventId, next);
+      return next;
+    });
+    setViewedTextEnvelopeIds((prev) => {
+      const next = new Set(prev);
+      next.add(b.id);
+      if (eventId) saveTextViewedIds(eventId, next);
+      return next;
+    });
+    window.setTimeout(() => {
+      setEnvelopePlayId((cur) => (cur === b.id ? null : cur));
+    }, 1120);
+  }
+
+  async function deleteBlirt(b: BlirtRow, opts?: { confirmMessage?: string }) {
     if (!supabase || bulkDeleting) return;
-    const ok = window.confirm('Delete this Blirt permanently?');
+    const ok = window.confirm(opts?.confirmMessage ?? 'Delete this Blirt permanently?');
     if (!ok) return;
     setBusyId(b.id);
     const t = (b.type || '').toLowerCase();
@@ -217,6 +409,23 @@ export default function HostEventManagePage() {
     setBusyId(null);
     setViewerBlirt((prev) => (prev?.id === b.id ? null : prev));
     setSelectedIds((prev) => prev.filter((id) => id !== b.id));
+    setOpenEnvelopeIds((prev) => {
+      const next = new Set(prev);
+      next.delete(b.id);
+      if (eventId) saveEnvelopeOpenedIds(eventId, next);
+      return next;
+    });
+    setEnvelopeCollapsedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(b.id);
+      return next;
+    });
+    setViewedTextEnvelopeIds((prev) => {
+      const next = new Set(prev);
+      next.delete(b.id);
+      if (eventId) saveTextViewedIds(eventId, next);
+      return next;
+    });
     loadBlirts();
   }
 
@@ -254,6 +463,23 @@ export default function HostEventManagePage() {
       }
       setViewerBlirt((prev) => (prev && ids.includes(prev.id) ? null : prev));
       setSelectedIds([]);
+      setOpenEnvelopeIds((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        if (eventId) saveEnvelopeOpenedIds(eventId, next);
+        return next;
+      });
+      setEnvelopeCollapsedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+      setViewedTextEnvelopeIds((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        if (eventId) saveTextViewedIds(eventId, next);
+        return next;
+      });
       loadBlirts();
     } finally {
       setBulkDeleting(false);
@@ -391,7 +617,14 @@ export default function HostEventManagePage() {
     }
     setZipExporting(true);
     try {
-      const { blob, skipped } = await buildBlirtsZip({ supabase, items, eventId });
+      const { blob, skipped } = await buildBlirtsZip({
+        supabase,
+        items,
+        eventId,
+        eventDisplayName: event
+          ? displayEventNames(event.partner_1, event.partner_2)
+          : 'Your event',
+      });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `blirts-media-${eventId.slice(0, 8)}${fileSuffix}.zip`;
@@ -416,6 +649,98 @@ export default function HostEventManagePage() {
   async function exportZipSelected() {
     const items = blirts.filter((b) => selectedIds.includes(b.id));
     await exportZipForBlirts(items, '-selected');
+  }
+
+  async function exportCollectionPdf() {
+    if (!event) {
+      window.alert('Still loading this event — try again in a moment.');
+      return;
+    }
+    if (!supabase) {
+      window.alert(
+        'Supabase is not configured (missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY). PDF export needs a working connection.',
+      );
+      return;
+    }
+    if (!blirts.length) {
+      window.alert('Nothing to export yet — add some Blirts first, or check that you opened the right event.');
+      return;
+    }
+    setPdfExporting(true);
+    // Let React paint “Building PDF…” before heavy work blocks the main thread.
+    await new Promise((r) => setTimeout(r, 50));
+    try {
+      const { blob, mediaLinkErrors } = await buildBlirtsCollectionPdf({
+        supabase,
+        items: blirts,
+        eventDisplayName: displayEventNames(event.partner_1, event.partner_2),
+        eventTypeLabel: event.event_type ?? null,
+      });
+      const name = collectionPdfFilename(displayEventNames(event.partner_1, event.partner_2));
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.rel = 'noopener';
+      // Detached anchor + click (same pattern as CSV/ZIP here) — avoids append/remove on body,
+      // which can race with React or extensions and throw removeChild errors.
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      if (mediaLinkErrors.length) {
+        window.alert(
+          `PDF saved. Some media links could not be added (${mediaLinkErrors.length}). Use “Download all files” for the original video and audio files.`,
+        );
+      }
+    } catch (e) {
+      console.error('Save my collection failed', e);
+      window.alert(
+        e instanceof Error ? e.message : 'Could not build PDF. If this keeps happening, try a different browser.',
+      );
+    } finally {
+      setPdfExporting(false);
+    }
+  }
+
+  async function saveGuestSlug() {
+    if (!supabase || !eventId || !event) return;
+    setSlugStatus(null);
+    const normalized = normalizeGuestSlugInput(slugDraft);
+    if (!normalized) {
+      setSlugStatus('Enter a short URL name (letters and numbers).');
+      return;
+    }
+    if (isReservedGuestSlug(normalized)) {
+      setSlugStatus('That URL is reserved. Pick another.');
+      return;
+    }
+    setSlugSaving(true);
+    try {
+      const { data: clash, error: clashErr } = await supabase
+        .from('events')
+        .select('id')
+        .eq('guest_slug', normalized)
+        .maybeSingle();
+      if (clashErr) {
+        setSlugStatus(clashErr.message);
+        return;
+      }
+      if (clash?.id && clash.id !== eventId) {
+        setSlugStatus('That URL is already taken by another event.');
+        return;
+      }
+      const { error } = await supabase
+        .from('events')
+        .update({ guest_slug: normalized })
+        .eq('id', eventId);
+      if (error) {
+        setSlugStatus(error.message);
+        return;
+      }
+      setEvent((prev) => (prev ? { ...prev, guest_slug: normalized } : prev));
+      setSlugStatus('Saved!');
+    } finally {
+      setSlugSaving(false);
+    }
   }
 
   async function savePrompts() {
@@ -535,90 +860,128 @@ export default function HostEventManagePage() {
 
       {tab === 'blirts' && (
         <div className={styles.card}>
-          <div className={styles.h2}>Blirts ({blirts.length})</div>
-          <p className={styles.muted} style={{ marginBottom: 12 }}>
-            Click a row to open and view. Use checkboxes for export or for delete, or delete everything in one step.
-          </p>
-          <p className={styles.muted} style={{ marginBottom: 12, fontSize: 13, lineHeight: 1.45 }}>
-            <strong>CSV</strong> = spreadsheet with text plus <strong>clickable links</strong> to video/audio (not the video files themselves).{' '}
-            <strong>ZIP</strong> = downloads the actual video, voice, and text files.
-          </p>
-          {Object.keys(mediaUrlErrors).length > 0 ? (
-            <p className={styles.rlsHelpBanner} role="status">
-              Some media could not be opened. <strong>Object not found</strong> means there is no file in Storage for
-              that row (upload failed before the fix) — you can delete those entries. Other errors are often
-              permissions — run{' '}
-              <code className={styles.inlineCode}>supabase/RLS_FIX_LOADING_AND_GUEST_UPLOAD.sql</code> in Supabase (full
-              script, section F adds guest cleanup), then refresh.
-            </p>
+          <div className={styles.blirtsInboxHeader}>
+            <h2 className={styles.blirtsInboxTitle}>Blirts ({blirts.length})</h2>
+            <button
+              type="button"
+              className={styles.collectionManageToggle}
+              aria-expanded={collectionToolsOpen}
+              aria-controls="host-collection-tools"
+              id="host-collection-tools-toggle"
+              onClick={() => setCollectionToolsOpen((o) => !o)}
+            >
+              Manage collection {collectionToolsOpen ? '↑' : '↓'}
+            </button>
+          </div>
+          {collectionToolsOpen ? (
+            <div
+              className={styles.collectionManagePanel}
+              id="host-collection-tools"
+              role="region"
+              aria-labelledby="host-collection-tools-toggle"
+            >
+              <p className={styles.muted} style={{ marginBottom: 12 }}>
+                Click a row to open and view. Use checkboxes for export or for delete, or delete everything in one step.
+              </p>
+              <p className={styles.muted} style={{ marginBottom: 12, fontSize: 13, lineHeight: 1.45 }}>
+                <strong>Save my collection</strong> — a readable PDF of written messages, plus links to open video and
+                voice notes (made for couples and keepsakes).{' '}
+                <strong>Export as spreadsheet</strong> — rows and columns for planners, vendors, or data work (includes
+                links to media, not the files themselves).{' '}
+                <strong>Download all files</strong> — the actual video, audio, and text files in a ZIP.
+              </p>
+              {Object.keys(mediaUrlErrors).length > 0 ? (
+                <p className={styles.rlsHelpBanner} role="status">
+                  Some media could not be opened. <strong>Object not found</strong> means there is no file in Storage for
+                  that row (upload failed before the fix) — you can delete those entries. Other errors are often
+                  permissions — run{' '}
+                  <code className={styles.inlineCode}>supabase/RLS_FIX_LOADING_AND_GUEST_UPLOAD.sql</code> in Supabase
+                  (full script, section F adds guest cleanup), then refresh.
+                </p>
+              ) : null}
+              <div className={styles.exportRow}>
+                <button
+                  type="button"
+                  className={styles.button}
+                  onClick={() => void exportCollectionPdf()}
+                  disabled={pdfExporting || exporting || zipExporting || bulkDeleting}
+                  title={
+                    blirts.length === 0
+                      ? 'Nothing to export yet — you can still click for a message'
+                      : undefined
+                  }
+                >
+                  {pdfExporting ? 'Building PDF…' : 'Save my collection'}
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.buttonGhost}`}
+                  onClick={() => exportCsvAll()}
+                  disabled={exporting || zipExporting || pdfExporting || bulkDeleting || blirts.length === 0}
+                >
+                  {exporting ? 'Exporting…' : 'Export all as spreadsheet'}
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.buttonGhost}`}
+                  onClick={() => exportCsvSelected()}
+                  disabled={exporting || zipExporting || pdfExporting || bulkDeleting || selectedIds.length === 0}
+                >
+                  {exporting ? 'Exporting…' : `Export selected (${selectedIds.length}) as spreadsheet`}
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.buttonGhost}`}
+                  onClick={() => exportZipAll()}
+                  disabled={zipExporting || exporting || pdfExporting || bulkDeleting || blirts.length === 0}
+                >
+                  {zipExporting ? 'Building ZIP…' : 'Download all files'}
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.buttonGhost}`}
+                  onClick={() => exportZipSelected()}
+                  disabled={zipExporting || exporting || pdfExporting || bulkDeleting || selectedIds.length === 0}
+                >
+                  {zipExporting ? 'Building ZIP…' : `Download selected (${selectedIds.length}) files`}
+                </button>
+              </div>
+              <div className={styles.exportRow}>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.buttonDanger}`}
+                  onClick={() => {
+                    const items = blirts.filter((b) => selectedIds.includes(b.id));
+                    void deleteBlirtsBulk(items);
+                  }}
+                  disabled={
+                    bulkDeleting ||
+                    exporting ||
+                    zipExporting ||
+                    pdfExporting ||
+                    selectedIds.length === 0 ||
+                    blirts.length === 0
+                  }
+                >
+                  {bulkDeleting ? 'Deleting…' : `Delete selected (${selectedIds.length})`}
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.buttonDanger}`}
+                  onClick={() => void deleteBlirtsBulk(blirts)}
+                  disabled={bulkDeleting || exporting || zipExporting || pdfExporting || blirts.length === 0}
+                >
+                  {bulkDeleting ? 'Deleting…' : `Delete all (${blirts.length})`}
+                </button>
+              </div>
+              {blirts.length > 0 && (
+                <label className={styles.selectAllRow}>
+                  <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
+                  <span>Select all</span>
+                </label>
+              )}
+            </div>
           ) : null}
-          <div className={styles.exportRow}>
-            <button
-              type="button"
-              className={`${styles.button} ${styles.buttonGhost}`}
-              onClick={() => exportCsvAll()}
-              disabled={exporting || zipExporting || bulkDeleting || blirts.length === 0}
-            >
-              {exporting ? 'Exporting…' : 'Export all (CSV)'}
-            </button>
-            <button
-              type="button"
-              className={`${styles.button} ${styles.buttonGhost}`}
-              onClick={() => exportCsvSelected()}
-              disabled={exporting || zipExporting || bulkDeleting || selectedIds.length === 0}
-            >
-              {exporting ? 'Exporting…' : `Export selected (${selectedIds.length}) CSV`}
-            </button>
-            <button
-              type="button"
-              className={`${styles.button} ${styles.buttonGhost}`}
-              onClick={() => exportZipAll()}
-              disabled={zipExporting || exporting || bulkDeleting || blirts.length === 0}
-            >
-              {zipExporting ? 'Building ZIP…' : 'Download all (ZIP)'}
-            </button>
-            <button
-              type="button"
-              className={`${styles.button} ${styles.buttonGhost}`}
-              onClick={() => exportZipSelected()}
-              disabled={zipExporting || exporting || bulkDeleting || selectedIds.length === 0}
-            >
-              {zipExporting ? 'Building ZIP…' : `Download selected (${selectedIds.length}) ZIP`}
-            </button>
-          </div>
-          <div className={styles.exportRow}>
-            <button
-              type="button"
-              className={`${styles.button} ${styles.buttonDanger}`}
-              onClick={() => {
-                const items = blirts.filter((b) => selectedIds.includes(b.id));
-                void deleteBlirtsBulk(items);
-              }}
-              disabled={
-                bulkDeleting ||
-                exporting ||
-                zipExporting ||
-                selectedIds.length === 0 ||
-                blirts.length === 0
-              }
-            >
-              {bulkDeleting ? 'Deleting…' : `Delete selected (${selectedIds.length})`}
-            </button>
-            <button
-              type="button"
-              className={`${styles.button} ${styles.buttonDanger}`}
-              onClick={() => void deleteBlirtsBulk(blirts)}
-              disabled={bulkDeleting || exporting || zipExporting || blirts.length === 0}
-            >
-              {bulkDeleting ? 'Deleting…' : `Delete all (${blirts.length})`}
-            </button>
-          </div>
-          {blirts.length > 0 && (
-            <label className={styles.selectAllRow}>
-              <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
-              <span>Select all</span>
-            </label>
-          )}
 
           {blirts.length === 0 ? (
             <p className={styles.muted}>Nothing yet—share your guest link.</p>
@@ -638,51 +1001,71 @@ export default function HostEventManagePage() {
                     onClick={(e) => e.stopPropagation()}
                     aria-label="Select for export"
                   />
-                  <button
-                    type="button"
-                    className={styles.blirtRowMain}
-                    onClick={() => setViewerBlirt(b)}
-                  >
-                    <div className={styles.blirtMeta}>
-                      <strong>{b.type}</strong>
-                      {guest ? ` · From: ${guest}` : ''} · {b.status ?? '—'} ·{' '}
-                      {b.created_at ? new Date(b.created_at).toLocaleString() : ''}
+                  {t === 'text' ? (
+                    <div className={`${styles.blirtRowMain} ${styles.blirtRowMainEnvelopeHost}`}>
+                      <div className={styles.blirtMeta}>
+                        <strong>{b.type}</strong>
+                        {guest ? ` · From: ${guest}` : ' · From: a friend'} · {b.status ?? '—'} ·{' '}
+                        {b.created_at ? new Date(b.created_at).toLocaleString() : ''}
+                      </div>
+                      <div className={styles.blirtRowTextBody}>
+                        <TextBlirtEnvelopeCard
+                          blirt={b}
+                          hasBeenViewed={textBlirtHasBeenViewed(b, viewedTextEnvelopeIds)}
+                          variant={envelopeVariantFor(
+                            b,
+                            openEnvelopeIds,
+                            envelopePlayId,
+                            envelopeCollapsedIds,
+                          )}
+                          onToggle={() => toggleTextEnvelope(b)}
+                        />
+                      </div>
                     </div>
-                    {promptLine ? (
-                      <div className={styles.blirtPreviewPrompt}>
-                        <span className={styles.blirtPromptLabel}>Prompt</span> {promptLine}
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.blirtRowMain}
+                      onClick={() => setViewerBlirt(b)}
+                    >
+                      <div className={styles.blirtMeta}>
+                        <strong>{b.type}</strong>
+                        {guest ? ` · From: ${guest}` : ' · From: a friend'} · {b.status ?? '—'} ·{' '}
+                        {b.created_at ? new Date(b.created_at).toLocaleString() : ''}
                       </div>
-                    ) : null}
-                    {t === 'text' && (
-                      <div className={styles.blirtPreviewText}>{b.content}</div>
-                    )}
-                    {t === 'video' && (
-                      <div
-                        className={
-                          mediaUrlErrors[b.id] ? styles.mediaErrorHint : styles.blirtPreviewHint
-                        }
-                      >
-                        {mediaUrlErrors[b.id]
-                          ? `Can't load: ${friendlyBlirtStorageError(mediaUrlErrors[b.id])}`
-                          : url
-                            ? 'Video — tap to play'
+                      {promptLine ? (
+                        <div className={styles.blirtPreviewPrompt}>
+                          <span className={styles.blirtPromptLabel}>Prompt</span> {promptLine}
+                        </div>
+                      ) : null}
+                      {t === 'video' && (
+                        <div
+                          className={
+                            mediaUrlErrors[b.id] ? styles.mediaErrorHint : styles.blirtPreviewHint
+                          }
+                        >
+                          {mediaUrlErrors[b.id]
+                            ? `Can't load: ${friendlyBlirtStorageError(mediaUrlErrors[b.id])}`
+                            : url
+                              ? 'Video — tap to play'
+                              : 'Loading…'}
+                        </div>
+                      )}
+                      {t === 'audio' && (
+                        <div
+                          className={
+                            mediaUrlErrors[b.id] ? styles.mediaErrorHint : styles.blirtPreviewHint
+                          }
+                        >
+                          {mediaUrlErrors[b.id]
+                            ? `Can't load: ${friendlyBlirtStorageError(mediaUrlErrors[b.id])}`
+                            : url
+                              ? 'Voice note — tap to play'
                             : 'Loading…'}
-                      </div>
-                    )}
-                    {t === 'audio' && (
-                      <div
-                        className={
-                          mediaUrlErrors[b.id] ? styles.mediaErrorHint : styles.blirtPreviewHint
-                        }
-                      >
-                        {mediaUrlErrors[b.id]
-                          ? `Can't load: ${friendlyBlirtStorageError(mediaUrlErrors[b.id])}`
-                          : url
-                            ? 'Voice note — tap to play'
-                            : 'Loading…'}
-                      </div>
-                    )}
-                  </button>
+                        </div>
+                      )}
+                    </button>
+                  )}
                   <div className={styles.blirtRowActions}>
                     {(t === 'video' || t === 'audio') && url && !mediaUrlErrors[b.id] && (
                       <a
@@ -735,7 +1118,7 @@ export default function HostEventManagePage() {
               <strong>{viewerBlirt.type}</strong>
               {(viewerBlirt.guest_name ?? '').trim()
                 ? ` · From: ${(viewerBlirt.guest_name ?? '').trim()}`
-                : ''}
+                : ' · From: a friend'}
               <br />
               · {viewerBlirt.status ?? '—'} ·{' '}
               {viewerBlirt.created_at
@@ -806,6 +1189,69 @@ export default function HostEventManagePage() {
             Guests use this exact URL. For phone cameras on Wi‑Fi, use your computer&apos;s LAN address
             (same as you used for testing) or your production domain.
           </p>
+          <p className={styles.muted} style={{ marginTop: 12 }}>
+            <strong>Pretty link</strong> — set a short path (like{' '}
+            <code className={styles.inlineCode}>ashley-birthday</code>) so the address is easy to read
+            and share. Run the SQL in <code className={styles.inlineCode}>supabase/events_guest_slug.sql</code>{' '}
+            once if you haven&apos;t yet.
+          </p>
+          <label className={styles.label} htmlFor="guest-slug">
+            Guest URL path
+          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <input
+              id="guest-slug"
+              className={styles.input}
+              style={{ maxWidth: 320, flex: '1 1 200px' }}
+              value={slugDraft}
+              onChange={(e) => {
+                setSlugDraft(e.target.value);
+                setSlugStatus(null);
+              }}
+              placeholder={defaultGuestSlug(
+                event.partner_1 ?? '',
+                event.partner_2 ?? '',
+                event.event_type ?? 'event',
+              )}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button
+              type="button"
+              className={`${styles.button} ${styles.buttonGhost}`}
+              onClick={() => {
+                setSlugDraft(
+                  defaultGuestSlug(
+                    event.partner_1 ?? '',
+                    event.partner_2 ?? '',
+                    event.event_type ?? 'event',
+                  ),
+                );
+                setSlugStatus(null);
+              }}
+            >
+              Suggest from names
+            </button>
+            <button
+              type="button"
+              className={styles.button}
+              onClick={() => void saveGuestSlug()}
+              disabled={slugSaving}
+            >
+              {slugSaving ? 'Saving…' : 'Save path'}
+            </button>
+          </div>
+          {slugStatus ? (
+            <div
+              className={slugStatus.startsWith('Saved') ? styles.success : styles.error}
+              style={{ marginTop: 8 }}
+            >
+              {slugStatus}
+            </div>
+          ) : null}
+          <div className={styles.h2} style={{ marginTop: 24 }}>
+            Full link &amp; QR
+          </div>
           <div className={styles.urlMono}>{guestUrl}</div>
           <button
             type="button"

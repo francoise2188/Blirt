@@ -1,17 +1,16 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import './globals.css';
-import { Inter, Dancing_Script } from 'next/font/google';
+import { DM_Sans, Fraunces } from 'next/font/google';
 
-const uiFont = Inter({
+const dmSans = DM_Sans({
   subsets: ['latin'],
   variable: '--font-ui',
   display: 'swap',
 });
 
-// Personality font for the Blirt wordmark + couple names.
-const blirtWordmarkFont = Dancing_Script({
-  weight: ['400', '600', '700'],
+/** Display: wordmark, headings, hero names */
+const fraunces = Fraunces({
   subsets: ['latin'],
   variable: '--font-blirt',
   display: 'swap',
@@ -29,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${uiFont.variable} ${blirtWordmarkFont.variable}`}>
+      <body className={`${dmSans.variable} ${fraunces.variable}`}>
         {children}
       </body>
     </html>

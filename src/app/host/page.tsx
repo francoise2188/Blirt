@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabaseClient';
+import { defaultGuestSlug, pickUniqueGuestSlug } from '../../lib/guestSlug';
 import { PROMPT_THEMES } from '../../lib/promptThemes';
 import styles from './host.module.css';
 
@@ -175,42 +176,60 @@ export default function HostHomePage() {
         ? customGreeting.trim()
         : (selected?.template ?? '').trim();
 
+    const suggestedSlug = await pickUniqueGuestSlug(
+      supabase,
+      defaultGuestSlug(a, b, eventType),
+    );
+
+    const insertMin = {
+      partner_1: a,
+      partner_2: b || '',
+      event_date: eventDate.trim(),
+      event_type: eventType,
+      prompts: starterPrompts,
+      prompt_randomize: true,
+      user_id: user.id,
+      owner_id: user.id,
+    };
+
+    const columnRetry = /celebration_message|guest_slug|schema cache|column/i;
+
     let { data, error } = await supabase
       .from('events')
       .insert({
-        partner_1: a,
-        // DB often has NOT NULL on partner_2; use empty string when there is no second name
-        partner_2: b || '',
-        event_date: eventDate.trim(),
-        event_type: eventType,
-        prompts: starterPrompts,
-        prompt_randomize: true,
+        ...insertMin,
         ...(celebrationMessage ? { celebration_message: celebrationMessage } : {}),
-        // Some databases use user_id, some use owner_id — set both when both columns exist
-        user_id: user.id,
-        owner_id: user.id,
+        ...(suggestedSlug ? { guest_slug: suggestedSlug } : {}),
       })
       .select('id')
       .single();
 
-    if (
-      error &&
-      (error.message.includes('celebration_message') ||
-        error.message.includes('schema cache') ||
-        error.message.includes('column'))
-    ) {
+    if (error && columnRetry.test(error.message)) {
       ({ data, error } = await supabase
         .from('events')
         .insert({
-          partner_1: a,
-          partner_2: b || '',
-          event_date: eventDate.trim(),
-          event_type: eventType,
-          prompts: starterPrompts,
-          prompt_randomize: true,
-          user_id: user.id,
-          owner_id: user.id,
+          ...insertMin,
+          ...(suggestedSlug ? { guest_slug: suggestedSlug } : {}),
         })
+        .select('id')
+        .single());
+    }
+
+    if (error && columnRetry.test(error.message)) {
+      ({ data, error } = await supabase
+        .from('events')
+        .insert({
+          ...insertMin,
+          ...(celebrationMessage ? { celebration_message: celebrationMessage } : {}),
+        })
+        .select('id')
+        .single());
+    }
+
+    if (error && columnRetry.test(error.message)) {
+      ({ data, error } = await supabase
+        .from('events')
+        .insert(insertMin)
         .select('id')
         .single());
     }

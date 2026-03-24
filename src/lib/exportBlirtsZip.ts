@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { normalizeBlirtMediaStoragePath } from './blirtsStoragePath';
+import { formatTextBlirtLetter } from './textBlirtLetterFormat';
 
 type BlirtRow = {
   id: string;
@@ -10,6 +11,36 @@ type BlirtRow = {
   prompt_snapshot?: string | null;
 };
 
+/** Safe segment for filenames: "Frankie" → frankie, "Ann Marie" → ann-marie */
+function slugForFilename(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-+/g, '-')
+    .slice(0, 48);
+}
+
+/**
+ * Human-readable .txt name: blirt-from-frankie.txt; anonymous → blirt-from-a-friend.txt.
+ * Repeats in the same export get -2, -3, … before .txt
+ */
+function nextTextBlirtFilename(
+  guestName: string | null,
+  usedStemCounts: Map<string, number>,
+): string {
+  const slug = guestName?.trim()
+    ? slugForFilename(guestName) || 'guest'
+    : 'a-friend';
+  const stem = `blirt-from-${slug}`;
+  const n = (usedStemCounts.get(stem) ?? 0) + 1;
+  usedStemCounts.set(stem, n);
+  return n === 1 ? `${stem}.txt` : `${stem}-${n}.txt`;
+}
+
 /**
  * Pack text files + downloaded video/audio into a ZIP for hosts.
  * (CSV can only hold links — this gives the actual media files.)
@@ -18,24 +49,27 @@ export async function buildBlirtsZip(params: {
   supabase: SupabaseClient;
   items: BlirtRow[];
   eventId: string;
+  /** e.g. "Ashley" or "Avery & Jordan" — shown in text Blirt letters */
+  eventDisplayName: string;
 }): Promise<{ blob: Blob; skipped: string[] }> {
   const JSZip = (await import('jszip')).default;
   const zip = new JSZip();
   const folder = zip.folder(`blirts-${params.eventId.slice(0, 8)}`);
   const skipped: string[] = [];
+  const textFilenameStems = new Map<string, number>();
 
   for (const b of params.items) {
     const t = (b.type || '').toLowerCase();
     if (t === 'text') {
-      const prompt = (b.prompt_snapshot ?? '').trim();
-      const head = [
-        `Guest name: ${b.guest_name?.trim() || '(not provided)'}`,
-        `Created: ${b.created_at ?? ''}`,
-        `Blirt id: ${b.id}`,
-      ];
-      if (prompt) head.push(`Prompt: ${prompt}`);
-      const body = [...head, '', '— Message —', '', b.content].join('\n');
-      folder?.file(`text-${b.id.slice(0, 8)}.txt`, body);
+      const body = formatTextBlirtLetter({
+        eventDisplayName: params.eventDisplayName,
+        guestName: b.guest_name,
+        prompt: (b.prompt_snapshot ?? '').trim(),
+        message: b.content,
+        createdAt: b.created_at,
+      });
+      const fname = nextTextBlirtFilename(b.guest_name, textFilenameStems);
+      folder?.file(fname, body);
       continue;
     }
 
