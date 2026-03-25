@@ -665,6 +665,374 @@
   background: #0a0a0a;
 }
 
+/* --- Soundtrack swipe card --- */
+.swipeSoundtrackCard {
+  position: relative;
+  width: 100%;
+  min-height: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #050505;
+}
+
+.swipeSoundtrackBg,
+.swipeSoundtrackBgFallback {
+  position: absolute;
+  inset: -24px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(24px);
+  transform: scale(1.08);
+  opacity: 0.95;
+}
+
+.swipeSoundtrackBgFallback {
+  background: radial-gradient(circle at 30% 20%, rgba(181, 204, 46, 0.35), rgba(0, 0, 0, 0.9));
+}
+
+.swipeSoundtrackBgOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.swipeSoundtrackTopRow {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: auto;
+}
+
+.swipeSoundtrackTopRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swipeSoundtrackType {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(181, 204, 46, 0.95);
+  color: #1a1a1a;
+  font-size: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+.swipeSoundtrackMute {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Vertical stack container to prevent overlap; scroll if too tall */
+.swipeSoundtrackInner {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 54px 16px 24px;
+  text-align: center;
+}
+
+.swipeSoundtrackArt,
+.swipeSoundtrackArtFallback {
+  width: 160px;
+  height: 160px;
+  border-radius: 16px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+}
+
+.swipeSoundtrackArtWrap {
+  position: relative;
+  width: 160px;
+  height: 160px;
+}
+
+@media (max-height: 740px) {
+  .swipeSoundtrackArt,
+  .swipeSoundtrackArtFallback {
+    width: 120px;
+    height: 120px;
+  }
+
+  .swipeSoundtrackArtWrap {
+    width: 120px;
+    height: 120px;
+  }
+}
+
+.swipeSoundtrackPreviewPlay {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.95);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+}
+
+.swipeSoundtrackPreviewControls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.swipeSoundtrackProgressTrack {
+  width: min(240px, 70vw);
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(181, 204, 46, 0.25);
+  overflow: hidden;
+}
+
+.swipeSoundtrackProgressFill {
+  height: 100%;
+  background: rgba(181, 204, 46, 0.95);
+  border-radius: 999px;
+  transition: width 120ms linear;
+}
+
+.swipeSoundtrackPreviewPlayTri {
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 16px solid rgba(181, 204, 46, 0.95);
+  margin-left: 3px;
+}
+
+.swipeSoundtrackPreviewPauseBars {
+  width: 16px;
+  height: 18px;
+  position: relative;
+}
+
+.swipeSoundtrackPreviewPauseBars::before,
+.swipeSoundtrackPreviewPauseBars::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  border-radius: 2px;
+  background: rgba(181, 204, 46, 0.95);
+}
+
+.swipeSoundtrackPreviewPauseBars::before {
+  left: 0;
+}
+
+.swipeSoundtrackPreviewPauseBars::after {
+  right: 0;
+}
+
+.swipeSoundtrackSpotifyBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 850;
+  text-decoration: none;
+  color: #fff;
+  background: #1db954;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.swipeSoundtrackSpotifyIcon {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  position: relative;
+  flex: 0 0 16px;
+}
+
+.swipeSoundtrackSpotifyIcon::before,
+.swipeSoundtrackSpotifyIcon::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  height: 2px;
+  border-radius: 999px;
+  background: #1db954;
+  opacity: 0.95;
+}
+
+.swipeSoundtrackSpotifyIcon::before {
+  top: 5px;
+}
+
+.swipeSoundtrackSpotifyIcon::after {
+  top: 9px;
+}
+
+.swipeSoundtrackArt {
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.swipeSoundtrackArtFallback {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.swipeSoundtrackTrack {
+  margin-top: 0;
+  font-size: 20px;
+  font-weight: 950;
+  line-height: 1.15;
+  color: rgba(255, 255, 255, 0.96);
+  max-width: min(520px, 92vw);
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.swipeSoundtrackArtist {
+  font-size: 16px;
+  font-weight: 750;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.swipeSoundtrackAlbum {
+  font-size: 12px;
+  font-weight: 650;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.swipeSoundtrackDedicatedBy {
+  margin-top: 0;
+  font-size: 14px;
+  font-style: italic;
+  font-weight: 650;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.swipeSoundtrackNoPreview {
+  margin-top: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.swipeSoundtrackMemory {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  display: flex;
+  justify-content: center;
+}
+
+.swipeSoundtrackVideo {
+  width: min(420px, 92vw);
+  max-height: 240px;
+  border-radius: 18px;
+  background: #000;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+
+.swipeSoundtrackWave {
+  width: min(420px, 92vw);
+  height: 74px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.swipeSoundtrackWave::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(181, 204, 46, 0.2),
+    rgba(181, 204, 46, 0.55),
+    rgba(181, 204, 46, 0.2)
+  );
+  transform: translateX(-40%);
+  animation: soundtrackWave 1.8s ease-in-out infinite;
+  opacity: 0.9;
+}
+
+@keyframes soundtrackWave {
+  0% {
+    transform: translateX(-55%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(55%);
+  }
+}
+
+.swipeSoundtrackText {
+  width: min(420px, 92vw);
+  border-radius: 18px;
+  padding: 14px 14px;
+  font-size: 15px;
+  line-height: 1.45;
+  font-weight: 650;
+  color: rgba(255, 255, 255, 0.96);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 500ms ease, transform 500ms ease;
+  white-space: pre-wrap;
+}
+
+.swipeSoundtrackTextShow {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.swipeSoundtrackMemoryErr {
+  width: min(420px, 92vw);
+  border-radius: 18px;
+  padding: 14px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 200, 200, 0.95);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  text-align: center;
+}
+
 .swipeVideoShell {
   position: relative;
   width: 100%;
@@ -679,6 +1047,7 @@
   display: block;
   object-fit: contain;
   background: #000;
+  pointer-events: none;
 }
 
 .swipeVideoOverlay {
@@ -693,6 +1062,7 @@
 .swipeVideoOverlayTop {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   padding: 10px;
   pointer-events: auto;
 }
@@ -770,6 +1140,48 @@
 .swipeAudio {
   width: 100%;
   margin-top: 4px;
+  pointer-events: none;
+}
+
+.swipeHiddenMedia {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.swipeCloseBtn {
+  appearance: none;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: rgba(20, 20, 20, 0.95);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 24px;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.swipeTapUnmutePill {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 18px;
+  z-index: 6;
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .swipeTextCard {

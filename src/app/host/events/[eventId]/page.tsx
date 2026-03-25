@@ -67,6 +67,13 @@ type BlirtRow = {
   created_at: string | null;
   guest_name: string | null;
   prompt_snapshot?: string | null;
+  soundtrack_message_type?: 'video' | 'audio' | 'text' | null;
+  spotify_track_id?: string | null;
+  spotify_track_name?: string | null;
+  spotify_artist_name?: string | null;
+  spotify_album_name?: string | null;
+  spotify_album_art_url?: string | null;
+  spotify_preview_url?: string | null;
 };
 
 function escapeCsv(value: string) {
@@ -209,7 +216,9 @@ export default function HostEventManagePage() {
     if (!supabase || !eventId) return;
     const { data, error } = await supabase
       .from('blirts')
-      .select('id, event_id, type, content, status, created_at, guest_name, prompt_snapshot')
+      .select(
+        'id, event_id, type, content, status, created_at, guest_name, prompt_snapshot, soundtrack_message_type, spotify_track_id, spotify_track_name, spotify_artist_name, spotify_album_name, spotify_album_art_url, spotify_preview_url',
+      )
       .eq('event_id', eventId)
       .order('created_at', { ascending: false });
     if (error) return;
@@ -343,7 +352,11 @@ export default function HostEventManagePage() {
       for (const b of blirts) {
         const t = (b.type || '').toLowerCase();
         const mediaPath = normalizeBlirtMediaStoragePath(b.content);
-        if ((t === 'video' || t === 'audio') && mediaPath.includes('/')) {
+        const soundtrackKind = (b.soundtrack_message_type || '').toLowerCase();
+        const needsSigned =
+          (t === 'video' || t === 'audio') ||
+          (t === 'soundtrack' && (soundtrackKind === 'video' || soundtrackKind === 'audio'));
+        if (needsSigned && mediaPath.includes('/')) {
           const { data, error } = await supabase.storage
             .from('blirts-media')
             .createSignedUrl(mediaPath, 7200);
@@ -1055,6 +1068,10 @@ export default function HostEventManagePage() {
               const url = mediaUrls[b.id];
               const guest = (b.guest_name ?? '').trim();
               const promptLine = (b.prompt_snapshot ?? '').trim();
+              const openSpotifyUrl =
+                t === 'soundtrack' && (b.spotify_track_id ?? '').trim()
+                  ? `https://open.spotify.com/track/${(b.spotify_track_id ?? '').trim()}`
+                  : null;
               return (
                 <div key={b.id} className={styles.blirtRow}>
                   <input
@@ -1126,6 +1143,26 @@ export default function HostEventManagePage() {
                             : url
                               ? 'Voice note — tap to play'
                             : 'Loading…'}
+                        </div>
+                      )}
+                      {t === 'soundtrack' && (
+                        <div className={styles.blirtPreviewHint}>
+                          🎵 Soundtrack — tap to view
+                          {openSpotifyUrl ? (
+                            <>
+                              {' '}
+                              ·{' '}
+                              <a
+                                className={styles.link}
+                                href={openSpotifyUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                Open in Spotify
+                              </a>
+                            </>
+                          ) : null}
                         </div>
                       )}
                     </button>
@@ -1210,7 +1247,15 @@ export default function HostEventManagePage() {
             ) : null}
             {(() => {
               const vt = (viewerBlirt.type || '').toLowerCase();
+              const soundtrackKind = (viewerBlirt.soundtrack_message_type ?? '').toLowerCase();
               if (vt === 'text') {
+                return (
+                  <div className={styles.modalBodyText} style={{ whiteSpace: 'pre-wrap' }}>
+                    {viewerBlirt.content}
+                  </div>
+                );
+              }
+              if (vt === 'soundtrack' && soundtrackKind === 'text') {
                 return (
                   <div className={styles.modalBodyText} style={{ whiteSpace: 'pre-wrap' }}>
                     {viewerBlirt.content}
@@ -1224,15 +1269,21 @@ export default function HostEventManagePage() {
                   </p>
                 );
               }
-              if (vt === 'video' && viewerUrl) {
+              if ((vt === 'video' || (vt === 'soundtrack' && soundtrackKind === 'video')) && viewerUrl) {
                 return <VideoFit src={viewerUrl} variant="modal" />;
               }
-              if (vt === 'audio' && viewerUrl) {
-                return <audio src={viewerUrl} controls className={styles.modalAudio} />;
+              if ((vt === 'audio' || (vt === 'soundtrack' && soundtrackKind === 'audio')) && viewerUrl) {
+                return <audio src={viewerUrl} controls autoPlay className={styles.modalAudio} />;
               }
               return <p className={styles.muted}>Loading media…</p>;
             })()}
-            {viewerUrl && (viewerBlirt.type || '').toLowerCase() !== 'text' && !viewerMediaError && (
+            {(() => {
+              const vt = (viewerBlirt.type || '').toLowerCase();
+              const soundtrackKind = (viewerBlirt.soundtrack_message_type ?? '').toLowerCase();
+              const nonText =
+                vt !== 'text' && !(vt === 'soundtrack' && soundtrackKind === 'text');
+              if (!viewerUrl || !nonText || viewerMediaError) return null;
+              return (
               <a
                 className={styles.link}
                 href={viewerUrl}
@@ -1242,7 +1293,26 @@ export default function HostEventManagePage() {
               >
                 Open / download file
               </a>
-            )}
+              );
+            })()}
+
+            {(() => {
+              const vt = (viewerBlirt.type || '').toLowerCase();
+              const tid = (viewerBlirt.spotify_track_id ?? '').trim();
+              if (vt !== 'soundtrack' || !tid) return null;
+              const openSpotifyUrl = `https://open.spotify.com/track/${tid}`;
+              return (
+                <a
+                  className={styles.link}
+                  href={openSpotifyUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: 'inline-block', marginTop: 8 }}
+                >
+                  Open in Spotify
+                </a>
+              );
+            })()}
             <div className={styles.modalFooter}>
               <button
                 type="button"

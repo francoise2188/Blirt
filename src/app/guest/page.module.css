@@ -145,7 +145,13 @@
 
 @media (min-width: 560px) {
   .options {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 860px) {
+  .options {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 
@@ -201,6 +207,182 @@
   gap: 10px;
   /* Don’t force a tall box after submit — reduces odd scroll / resize on phones */
   min-height: min(220px, 45dvh);
+}
+
+/* Soundtrack Blirt */
+.soundtrackWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.soundtrackHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.soundtrackTitle {
+  font-weight: 950;
+  font-size: 14px;
+}
+
+.soundtrackSearchInput {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(21, 21, 21, 0.12);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 12px 12px;
+  font-size: 14px;
+  font-weight: 650;
+  outline: none;
+}
+
+.soundtrackSearchInput:focus {
+  border-color: rgba(181, 204, 46, 0.7);
+  box-shadow: 0 0 0 4px rgba(181, 204, 46, 0.18);
+}
+
+.soundtrackResults {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.soundtrackResultCard {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 16px;
+  padding: 10px 12px;
+  border: 1px solid rgba(21, 21, 21, 0.08);
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+}
+
+.soundtrackResultCard:hover {
+  transform: translateY(-1px);
+}
+
+.soundtrackThumb,
+.soundtrackThumbFallback {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  flex: 0 0 44px;
+}
+
+.soundtrackThumb {
+  object-fit: cover;
+}
+
+.soundtrackThumbFallback {
+  background: rgba(21, 21, 21, 0.06);
+}
+
+.soundtrackResultText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.soundtrackTrackName {
+  font-weight: 900;
+  font-size: 14px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.soundtrackArtistName {
+  font-size: 13px;
+  font-weight: 650;
+  color: rgba(21, 21, 21, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.soundtrackMuted {
+  font-size: 13px;
+  font-weight: 650;
+  color: rgba(21, 21, 21, 0.6);
+}
+
+.soundtrackError {
+  font-size: 13px;
+  font-weight: 750;
+  color: rgba(170, 24, 24, 0.9);
+}
+
+.soundtrackSelectedCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 16px;
+  padding: 10px 12px;
+  border: 1px solid rgba(181, 204, 46, 0.55);
+  background: rgba(181, 204, 46, 0.08);
+}
+
+.soundtrackSelectedLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.soundtrackCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(181, 204, 46, 0.95);
+  color: rgba(21, 21, 21, 0.92);
+  font-weight: 950;
+  flex: 0 0 22px;
+}
+
+.soundtrackChangeLink {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 850;
+  color: rgba(21, 21, 21, 0.72);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  flex-shrink: 0;
+}
+
+.soundtrackPrompt {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 750;
+  color: rgba(21, 21, 21, 0.8);
+}
+
+.soundtrackMemoryOptions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 560px) {
+  .soundtrackMemoryOptions {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 /* Collapse composer while full-screen camera is open (no duplicate layout / scroll jump). */

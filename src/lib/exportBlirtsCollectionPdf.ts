@@ -20,7 +20,10 @@ type BlirtRow = {
   created_at: string | null;
   guest_name: string | null;
   prompt_snapshot?: string | null;
+  soundtrack_message_type?: 'video' | 'audio' | 'text' | null;
 };
+
+const SOUNDTRACK_PROMPT = 'This song reminds me of you because...';
 
 const MARGIN = 52;
 const PAGE_H = 792;
@@ -135,10 +138,23 @@ export async function buildBlirtsCollectionPdf(params: {
   y += 40;
 
   const sorted = sortChronological(items);
-  const texts = sorted.filter((b) => (b.type || '').toLowerCase() === 'text');
+  const texts = sorted.filter((b) => {
+    const t = (b.type || '').toLowerCase();
+    if (t === 'text') return true;
+    if (t === 'soundtrack') {
+      const mt = (b.soundtrack_message_type ?? '').toLowerCase();
+      return mt === 'text';
+    }
+    return false;
+  });
   const media = sorted.filter((b) => {
     const t = (b.type || '').toLowerCase();
-    return t === 'video' || t === 'audio';
+    if (t === 'video' || t === 'audio') return true;
+    if (t === 'soundtrack') {
+      const mt = (b.soundtrack_message_type ?? '').toLowerCase();
+      return mt === 'video' || mt === 'audio';
+    }
+    return false;
   });
 
   // —— Text messages (letter format)
@@ -152,7 +168,7 @@ export async function buildBlirtsCollectionPdf(params: {
       const letter = formatTextBlirtLetter({
         eventDisplayName,
         guestName: b.guest_name,
-        prompt: (b.prompt_snapshot ?? '').trim(),
+        prompt: (b.type || '').toLowerCase() === 'soundtrack' ? SOUNDTRACK_PROMPT : (b.prompt_snapshot ?? '').trim(),
         message: b.content,
         createdAt: b.created_at,
       });
@@ -212,7 +228,7 @@ export async function buildBlirtsCollectionPdf(params: {
       const label = t === 'video' ? 'Video' : 'Voice note';
       const guest = b.guest_name?.trim() || 'A friend';
       const when = formatLetterDate(b.created_at);
-      const prompt = (b.prompt_snapshot ?? '').trim();
+      const prompt = (b.type || '').toLowerCase() === 'soundtrack' ? SOUNDTRACK_PROMPT : (b.prompt_snapshot ?? '').trim();
 
       const mediaPath = normalizeBlirtMediaStoragePath(b.content);
       ensureBottom(120);

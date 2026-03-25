@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import confetti from 'canvas-confetti';
 import styles from './page.module.css';
 import { supabase } from '../../lib/supabaseClient';
-import { submitGuestMediaBlirt } from '../../lib/submitGuestBlirt';
+import { submitGuestMediaBlirt, submitGuestSoundtrackMediaBlirt } from '../../lib/submitGuestBlirt';
 import { GUEST_MAX_PROMPT_SKIPS } from '../../lib/promptLibrary';
 import { VideoFit } from '../../components/VideoFit';
 import {
@@ -20,7 +20,19 @@ import {
   type LiveRecording,
 } from '../../lib/guestMediaCapture';
 
-type Mode = 'video' | 'audio' | 'text';
+type Mode = 'video' | 'audio' | 'text' | 'soundtrack';
+type MessageMode = 'video' | 'audio' | 'text';
+
+type SpotifySearchResult = {
+  id: string;
+  name: string;
+  artist_name: string;
+  album_name: string;
+  album_art_url: string | null;
+  preview_url: string | null;
+};
+
+const SOUNDTRACK_PROMPT = 'This song reminds me of you because...';
 
 function pickInitialTemplate(pool: string[], useRandom: boolean): string {
   if (!pool.length) return '';
@@ -112,6 +124,13 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [mode, setMode] = useState<Mode>('video');
+  const [soundtrackStep, setSoundtrackStep] = useState<1 | 2>(1);
+  const [soundtrackMessageType, setSoundtrackMessageType] = useState<MessageMode>('video');
+  const [spotifyQuery, setSpotifyQuery] = useState('');
+  const [spotifySearching, setSpotifySearching] = useState(false);
+  const [spotifyError, setSpotifyError] = useState<string | null>(null);
+  const [spotifyResults, setSpotifyResults] = useState<SpotifySearchResult[]>([]);
+  const [selectedTrack, setSelectedTrack] = useState<SpotifySearchResult | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [message, setMessage] = useState('');
@@ -159,6 +178,11 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
   /** Typewriter display for the prompt line */
   const [promptTyped, setPromptTyped] = useState('');
 
+  const activePrompt = useMemo(() => {
+    if (mode === 'soundtrack') return SOUNDTRACK_PROMPT;
+    return couple.prompt;
+  }, [mode, couple.prompt]);
+
   const skipsLeft = GUEST_MAX_PROMPT_SKIPS - skipCount;
   const canSwapPrompt =
     eventId !== 'demo' && promptTemplates.length > 1 && skipCount < GUEST_MAX_PROMPT_SKIPS;
@@ -192,7 +216,7 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
   }, [eventId]);
 
   useEffect(() => {
-    const target = couple.prompt;
+    const target = activePrompt;
     setPromptTyped('');
     if (!target) return undefined;
     let i = 0;
@@ -205,7 +229,7 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
       }
     }, stepMs);
     return () => clearInterval(id);
-  }, [couple.prompt]);
+  }, [activePrompt]);
 
   useEffect(() => {
     if (eventId === 'demo') return;
@@ -345,7 +369,96 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
     setMessage('');
     setGuestName('');
     setSubmitted(false);
+    setSoundtrackStep(1);
+    setSoundtrackMessageType('video');
+    setSpotifyQuery('');
+    setSpotifySearching(false);
+    setSpotifyError(null);
+    setSpotifyResults([]);
+    setSelectedTrack(null);
   }, [mode]);
+
+  // Inside soundtrack mode, switching memory type should behave like switching modes (but keep the chosen song).
+  useEffect(() => {
+    if (mode !== 'soundtrack') return;
+    if (!selectedTrack) return;
+
+    // Stop any in-progress camera/mic capture when switching memory type.
+    if (countdownStreamRef.current) {
+      countdownStreamRef.current.getTracks().forEach((t) => t.stop());
+      countdownStreamRef.current = null;
+    }
+    countdownModeRef.current = null;
+    setCountdown(null);
+    const live = liveRecordingRef.current;
+    if (live) {
+      live.abort();
+      liveRecordingRef.current = null;
+    }
+    if (liveVideoRef.current) {
+      liveVideoRef.current.srcObject = null;
+    }
+    setIsRecording(false);
+    setLiveStreamForPreview(null);
+    setRecordHint(null);
+    setVideoFacing('user');
+    setVideoFile(null);
+    setAudioFile(null);
+    setMessage('');
+    setSubmitted(false);
+    setEventError(null);
+  }, [mode, selectedTrack, soundtrackMessageType]);
+
+  const activeMessageMode: MessageMode | null = useMemo(() => {
+    if (mode === 'soundtrack') {
+      if (!selectedTrack) return null;
+      return soundtrackMessageType;
+    }
+    return mode;
+  }, [mode, selectedTrack, soundtrackMessageType]);
+
+  // Spotify search (debounced 400ms) while on Step 1.
+  useEffect(() => {
+    if (mode !== 'soundtrack') return;
+    if (soundtrackStep !== 1) return;
+    if (selectedTrack) return;
+    const q = spotifyQuery.trim();
+    setSpotifyError(null);
+    if (!q) {
+      setSpotifySearching(false);
+      setSpotifyResults([]);
+      return;
+    }
+    const ctrl = new AbortController();
+    setSpotifySearching(true);
+    const t = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch(`/api/spotify/search?q=${encodeURIComponent(q)}`, {
+            signal: ctrl.signal,
+          });
+          if (!res.ok) {
+            const body = (await res.json().catch(() => null)) as { error?: string } | null;
+            throw new Error(body?.error || `Search failed (${res.status})`);
+          }
+          const body = (await res.json()) as { results?: SpotifySearchResult[] };
+          if (!ctrl.signal.aborted) {
+            setSpotifyResults(Array.isArray(body.results) ? body.results : []);
+            setSpotifySearching(false);
+          }
+        } catch (e) {
+          if (ctrl.signal.aborted) return;
+          setSpotifySearching(false);
+          setSpotifyResults([]);
+          setSpotifyError(e instanceof Error ? e.message : 'Search failed');
+        }
+      })();
+    }, 400);
+    return () => {
+      ctrl.abort();
+      clearTimeout(t);
+    };
+  }, [mode, soundtrackStep, selectedTrack, spotifyQuery]);
 
   useEffect(() => {
     return () => {
@@ -437,25 +550,39 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
   }, [countdown]);
 
   const canSubmit = useMemo(() => {
-    if (mode === 'text') return message.trim().length > 0;
-    if (mode === 'video') return Boolean(videoFile);
+    if (!activeMessageMode) return false;
+    if (activeMessageMode === 'text') return message.trim().length > 0;
+    if (activeMessageMode === 'video') return Boolean(videoFile);
     return Boolean(audioFile);
-  }, [audioFile, message, mode, videoFile]);
+  }, [activeMessageMode, audioFile, message, videoFile]);
 
   const bigButtonLabel = useMemo(() => {
     if (submitted) return 'Sent!';
     if (isSubmitting) {
-      return mode === 'text' ? 'Sending…' : 'Uploading…';
+      return activeMessageMode === 'text' ? 'Sending…' : 'Uploading…';
     }
-    if (mode === 'text') return 'Submit';
+    if (mode === 'soundtrack' && (!selectedTrack || soundtrackStep === 1)) return 'Select a song';
+    if (!activeMessageMode) return 'Continue';
+    if (activeMessageMode === 'text') return 'Submit';
     if (countdown !== null) return 'Cancel';
-    if (mode === 'video') {
+    if (activeMessageMode === 'video') {
       if (isRecording) return 'Stop';
       return videoFile ? 'Submit' : 'Record';
     }
     if (isRecording) return 'Stop';
     return audioFile ? 'Submit' : 'Record';
-  }, [audioFile, countdown, isRecording, isSubmitting, mode, submitted, videoFile]);
+  }, [
+    activeMessageMode,
+    audioFile,
+    countdown,
+    isRecording,
+    isSubmitting,
+    mode,
+    selectedTrack,
+    soundtrackStep,
+    submitted,
+    videoFile,
+  ]);
 
   const stopVideoRecording = useCallback(async () => {
     const live = liveRecordingRef.current;
@@ -549,18 +676,18 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
   useEffect(() => {
     if (!isRecording) return;
     const t = window.setTimeout(() => {
-      if (mode === 'video') void stopVideoRecording();
-      else if (mode === 'audio') void stopAudioRecording();
+      if (activeMessageMode === 'video') void stopVideoRecording();
+      else if (activeMessageMode === 'audio') void stopAudioRecording();
     }, MAX_RECORDING_SECONDS * 1000);
     return () => clearTimeout(t);
-  }, [isRecording, mode, stopAudioRecording, stopVideoRecording]);
+  }, [isRecording, activeMessageMode, stopAudioRecording, stopVideoRecording]);
 
   /** Full-screen camera layer (countdown + record) so the page doesn’t scroll/jump each second. */
   const showVideoFullscreen = useMemo(
     () =>
-      mode === 'video' &&
+      activeMessageMode === 'video' &&
       (isRecording || (countdown !== null && countdown > 0)),
-    [mode, isRecording, countdown],
+    [activeMessageMode, isRecording, countdown],
   );
 
   useEffect(() => {
@@ -574,25 +701,25 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
 
   useEffect(() => {
     setRecordingTroubleshootOpen(false);
-  }, [mode]);
+  }, [activeMessageMode]);
 
   const showSubmitBlocking = isSubmitting && !submitted;
 
   /** Idle media: no big dashed instruction box — hints sit above the Record button instead. */
   const composerMediaIdle =
     !submitted &&
-    ((mode === 'video' && !videoPreviewUrl && !showVideoFullscreen) ||
-      (mode === 'audio' && countdown === null && !isRecording && !audioPreviewUrl));
+    ((activeMessageMode === 'video' && !videoPreviewUrl && !showVideoFullscreen) ||
+      (activeMessageMode === 'audio' && countdown === null && !isRecording && !audioPreviewUrl));
 
   const showIdleRecordingHints =
     !submitted &&
     !showVideoFullscreen &&
-    ((mode === 'video' && !videoPreviewUrl) ||
-      (mode === 'audio' && !audioPreviewUrl && !isRecording && countdown === null));
+    ((activeMessageMode === 'video' && !videoPreviewUrl) ||
+      (activeMessageMode === 'audio' && !audioPreviewUrl && !isRecording && countdown === null));
 
   const showAudioIdleFallback =
     !submitted &&
-    mode === 'audio' &&
+    activeMessageMode === 'audio' &&
     !audioPreviewUrl &&
     !isRecording &&
     countdown === null &&
@@ -622,12 +749,14 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
 
     if (isSubmitting) return;
 
+    if (mode === 'soundtrack' && (!selectedTrack || soundtrackStep === 1)) return;
+
     if (countdown !== null) {
       cancelCountdown();
       return;
     }
 
-    if (mode === 'text') {
+    if (activeMessageMode === 'text') {
       if (!canSubmit) return;
 
       if (eventId === 'demo') {
@@ -642,18 +771,43 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
 
       setIsSubmitting(true);
       try {
-        const { error } = await supabase.from('blirts').insert({
-          event_id: eventId,
-          guest_name: guestName.trim() || null,
-          type: 'text',
-          content: message.trim(),
-          status: 'pending',
-          prompt_snapshot: couple.prompt.trim() || null,
-        });
+        if (mode === 'soundtrack') {
+          if (!selectedTrack) return;
+          console.log('[Soundtrack guest] submitting text blirt selectedTrack.preview_url =', selectedTrack.preview_url);
+          const { error } = await supabase.from('blirts').insert({
+            event_id: eventId,
+            guest_name: guestName.trim() || null,
+            type: 'soundtrack',
+            content: message.trim(),
+            status: 'pending',
+            prompt_snapshot: SOUNDTRACK_PROMPT,
+            soundtrack_message_type: 'text',
+            spotify_track_id: selectedTrack.id,
+            spotify_track_name: selectedTrack.name,
+            spotify_artist_name: selectedTrack.artist_name,
+            spotify_album_name: selectedTrack.album_name,
+            spotify_album_art_url: selectedTrack.album_art_url,
+            spotify_preview_url: selectedTrack.preview_url,
+          });
 
-        if (error) {
-          setEventError(error.message);
-          return;
+          if (error) {
+            setEventError(error.message);
+            return;
+          }
+        } else {
+          const { error } = await supabase.from('blirts').insert({
+            event_id: eventId,
+            guest_name: guestName.trim() || null,
+            type: 'text',
+            content: message.trim(),
+            status: 'pending',
+            prompt_snapshot: couple.prompt.trim() || null,
+          });
+
+          if (error) {
+            setEventError(error.message);
+            return;
+          }
         }
 
         markSubmitted();
@@ -666,7 +820,7 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
       return;
     }
 
-    if (mode === 'video') {
+    if (activeMessageMode === 'video') {
       if (isRecording) {
         await stopVideoRecording();
         return;
@@ -699,13 +853,33 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
       setIsSubmitting(true);
       setEventError(null);
       try {
-        const { error: mediaErr } = await submitGuestMediaBlirt(supabase, {
-          eventId,
-          file: videoFile,
-          type: 'video',
-          guestName: guestName.trim() || null,
-          promptSnapshot: couple.prompt.trim() || null,
-        });
+        const { error: mediaErr } =
+          mode === 'soundtrack'
+            ? await (async () => {
+                if (!selectedTrack) return { error: 'Pick a song first.' };
+                return await submitGuestSoundtrackMediaBlirt(supabase, {
+                  eventId,
+                  file: videoFile,
+                  soundtrackMessageType: 'video',
+                  guestName: guestName.trim() || null,
+                  promptSnapshot: SOUNDTRACK_PROMPT,
+                  spotify: {
+                    track_id: selectedTrack.id,
+                    track_name: selectedTrack.name,
+                    artist_name: selectedTrack.artist_name,
+                    album_name: selectedTrack.album_name,
+                    album_art_url: selectedTrack.album_art_url,
+                    preview_url: selectedTrack.preview_url,
+                  },
+                });
+              })()
+            : await submitGuestMediaBlirt(supabase, {
+                eventId,
+                file: videoFile,
+                type: 'video',
+                guestName: guestName.trim() || null,
+                promptSnapshot: couple.prompt.trim() || null,
+              });
         if (mediaErr) {
           setEventError(mediaErr);
           return;
@@ -759,13 +933,33 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
     setIsSubmitting(true);
     setEventError(null);
     try {
-      const { error: mediaErr } = await submitGuestMediaBlirt(supabase, {
-        eventId,
-        file: audioFile,
-        type: 'audio',
-        guestName: guestName.trim() || null,
-        promptSnapshot: couple.prompt.trim() || null,
-      });
+      const { error: mediaErr } =
+        mode === 'soundtrack'
+          ? await (async () => {
+              if (!selectedTrack) return { error: 'Pick a song first.' };
+              return await submitGuestSoundtrackMediaBlirt(supabase, {
+                eventId,
+                file: audioFile,
+                soundtrackMessageType: 'audio',
+                guestName: guestName.trim() || null,
+                promptSnapshot: SOUNDTRACK_PROMPT,
+                spotify: {
+                  track_id: selectedTrack.id,
+                  track_name: selectedTrack.name,
+                  artist_name: selectedTrack.artist_name,
+                  album_name: selectedTrack.album_name,
+                  album_art_url: selectedTrack.album_art_url,
+                  preview_url: selectedTrack.preview_url,
+                },
+              });
+            })()
+          : await submitGuestMediaBlirt(supabase, {
+              eventId,
+              file: audioFile,
+              type: 'audio',
+              guestName: guestName.trim() || null,
+              promptSnapshot: couple.prompt.trim() || null,
+            });
       if (mediaErr) {
         setEventError(mediaErr);
         return;
@@ -853,7 +1047,7 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
             <div className={styles.promptLabel}>Prompt</div>
             {eventId !== 'demo' && promptTemplates.length > 1 && (
               <div className={styles.promptActions}>
-                {canSwapPrompt ? (
+                {mode !== 'soundtrack' && canSwapPrompt ? (
                   <button
                     type="button"
                     className={styles.skipPromptButton}
@@ -861,15 +1055,15 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
                   >
                     New prompt ({skipsLeft} left)
                   </button>
-                ) : (
+                ) : mode !== 'soundtrack' ? (
                   <span className={styles.skipPromptMuted}>No more new prompts</span>
-                )}
+                ) : null}
               </div>
             )}
           </div>
           <p className={styles.prompt} aria-live="polite">
             &ldquo;{promptTyped}
-            {promptTyped.length < couple.prompt.length ? (
+            {promptTyped.length < activePrompt.length ? (
               <span className={styles.promptCaret} aria-hidden>
                 |
               </span>
@@ -920,6 +1114,18 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
           <div className={styles.optionTitle}>Write a message</div>
           <div className={styles.optionHint}>No pressure. Just you.</div>
         </button>
+
+        <button
+          type="button"
+          className={`${styles.optionCard} ${
+            mode === 'soundtrack' ? styles.optionCardActive : ''
+          }`}
+          onClick={() => setMode('soundtrack')}
+        >
+          <div className={styles.optionIcon}>🎵</div>
+          <div className={styles.optionTitle}>Dedicate a song</div>
+          <div className={styles.optionHint}>Pick a song and tell them why</div>
+        </button>
       </div>
 
       {eventId !== 'demo' && eventError && (
@@ -957,7 +1163,147 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
         aria-label="Composer"
         aria-hidden={showVideoFullscreen}
       >
-        {mode === 'video' && (
+        {mode === 'soundtrack' && !selectedTrack && (
+          <div className={styles.soundtrackWrap} aria-label="Song search">
+            <div className={styles.soundtrackHead}>
+              <div className={styles.soundtrackTitle}>Step 1 — Pick a song</div>
+            </div>
+            <input
+              className={styles.soundtrackSearchInput}
+              value={spotifyQuery}
+              onChange={(e) => setSpotifyQuery(e.target.value)}
+              placeholder="Search for a song..."
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {spotifyError ? (
+              <div className={styles.soundtrackError} role="alert">
+                {spotifyError}
+              </div>
+            ) : null}
+            {spotifySearching ? (
+              <div className={styles.soundtrackMuted} role="status">
+                Searching…
+              </div>
+            ) : null}
+            <div className={styles.soundtrackResults} role="list" aria-label="Search results">
+              {spotifyResults.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  className={styles.soundtrackResultCard}
+                  onClick={() => {
+                    console.log('[Soundtrack guest] selected track =', r);
+                    console.log('[Soundtrack guest] selected.preview_url =', r.preview_url);
+                    setSelectedTrack(r);
+                    setSoundtrackStep(2);
+                  }}
+                  role="listitem"
+                >
+                  {r.album_art_url ? (
+                    <img
+                      src={r.album_art_url}
+                      alt=""
+                      className={styles.soundtrackThumb}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
+                    <div className={styles.soundtrackThumbFallback} aria-hidden />
+                  )}
+                  <div className={styles.soundtrackResultText}>
+                    <div className={styles.soundtrackTrackName}>{r.name}</div>
+                    <div className={styles.soundtrackArtistName}>{r.artist_name}</div>
+                  </div>
+                </button>
+              ))}
+              {!spotifySearching && spotifyQuery.trim() && spotifyResults.length === 0 && !spotifyError ? (
+                <div className={styles.soundtrackMuted} role="status">
+                  No results yet — try another search.
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        {mode === 'soundtrack' && selectedTrack && (
+          <div className={styles.soundtrackWrap} aria-label="Selected song">
+            <div className={styles.soundtrackSelectedCard}>
+              <div className={styles.soundtrackSelectedLeft}>
+                <span className={styles.soundtrackCheck} aria-hidden>
+                  ✓
+                </span>
+                {selectedTrack.album_art_url ? (
+                  <img
+                    src={selectedTrack.album_art_url}
+                    alt=""
+                    className={styles.soundtrackThumb}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <div className={styles.soundtrackThumbFallback} aria-hidden />
+                )}
+                <div className={styles.soundtrackResultText}>
+                  <div className={styles.soundtrackTrackName}>{selectedTrack.name}</div>
+                  <div className={styles.soundtrackArtistName}>{selectedTrack.artist_name}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className={styles.soundtrackChangeLink}
+                onClick={() => {
+                  setSelectedTrack(null);
+                  setSoundtrackStep(1);
+                }}
+              >
+                Change song
+              </button>
+            </div>
+
+            <div className={styles.soundtrackPrompt} role="status">
+              Now tell them why — how does this song remind you of them?
+            </div>
+
+            <div className={styles.soundtrackMemoryOptions} role="group" aria-label="Memory type">
+              <button
+                type="button"
+                className={`${styles.optionCard} ${
+                  soundtrackMessageType === 'video' ? styles.optionCardActive : ''
+                }`}
+                onClick={() => setSoundtrackMessageType('video')}
+              >
+                <div className={styles.optionIcon}>🎥</div>
+                <div className={styles.optionTitle}>Record a video</div>
+              </button>
+              <button
+                type="button"
+                className={`${styles.optionCard} ${
+                  soundtrackMessageType === 'audio' ? styles.optionCardActive : ''
+                }`}
+                onClick={() => setSoundtrackMessageType('audio')}
+              >
+                <div className={styles.optionIcon}>🎙️</div>
+                <div className={styles.optionTitle}>Leave a voice note</div>
+              </button>
+              <button
+                type="button"
+                className={`${styles.optionCard} ${
+                  soundtrackMessageType === 'text' ? styles.optionCardActive : ''
+                }`}
+                onClick={() => {
+                  setSoundtrackMessageType('text');
+                  setTimeout(() => messageRef.current?.focus(), 0);
+                }}
+              >
+                <div className={styles.optionIcon}>✍️</div>
+                <div className={styles.optionTitle}>Write a message</div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeMessageMode === 'video' && (
           <>
             {!showVideoFullscreen && videoPreviewUrl ? (
               <>
@@ -981,7 +1327,7 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
           </>
         )}
 
-        {mode === 'audio' && (
+        {activeMessageMode === 'audio' && (
           <>
             <input
               ref={audioInputRef}
@@ -1051,7 +1397,7 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
           </>
         )}
 
-        {mode === 'text' && (
+        {activeMessageMode === 'text' && (
           <>
             <textarea
               ref={messageRef}
@@ -1143,11 +1489,13 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
               onClick={handleBigButtonClick}
               disabled={
                 isSubmitting ||
-                (mode === 'text' && !message.trim() && !submitted)
+                (mode === 'soundtrack' && (!selectedTrack || !activeMessageMode)) ||
+                (activeMessageMode === 'text' && !message.trim() && !submitted)
               }
               aria-disabled={
                 isSubmitting ||
-                (mode === 'text' && !message.trim() && !submitted)
+                (mode === 'soundtrack' && (!selectedTrack || !activeMessageMode)) ||
+                (activeMessageMode === 'text' && !message.trim() && !submitted)
               }
             >
               {bigButtonLabel}
@@ -1209,11 +1557,13 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
             onClick={handleBigButtonClick}
             disabled={
               isSubmitting ||
-              (mode === 'text' && !message.trim() && !submitted)
+              (mode === 'soundtrack' && (!selectedTrack || !activeMessageMode)) ||
+              (activeMessageMode === 'text' && !message.trim() && !submitted)
             }
             aria-disabled={
               isSubmitting ||
-              (mode === 'text' && !message.trim() && !submitted)
+              (mode === 'soundtrack' && (!selectedTrack || !activeMessageMode)) ||
+              (activeMessageMode === 'text' && !message.trim() && !submitted)
             }
           >
             {bigButtonLabel}
