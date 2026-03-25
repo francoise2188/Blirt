@@ -233,6 +233,7 @@
   padding: 0;
   font: inherit;
   width: 100%;
+  min-width: 0;
   border-radius: 10px;
 }
 
@@ -251,6 +252,7 @@
 /* Text row uses envelope UI instead of a single clickable preview */
 .blirtRowMainEnvelopeHost {
   cursor: default;
+  min-width: 0;
 }
 
 .blirtRowActions {
@@ -484,6 +486,415 @@
   font-size: 12px;
   opacity: 0.75;
   line-height: 1.35;
+}
+
+/* --- Host inbox: Envelopes vs Swipe --- */
+.inboxViewToggle {
+  display: flex;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto 14px;
+  padding: 4px;
+  gap: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(21, 21, 21, 0.14);
+  background: rgba(255, 255, 255, 0.55);
+  box-sizing: border-box;
+}
+
+.inboxViewToggleOpt {
+  flex: 1;
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 850;
+  font-family: inherit;
+  cursor: pointer;
+  background: transparent;
+  color: #1a1a1a;
+  touch-action: manipulation;
+}
+
+.inboxViewToggleActive {
+  background: #b5cc2e;
+  border-color: rgba(21, 21, 21, 0.12);
+  color: #1a1a1a;
+}
+
+.inboxViewToggleOpt:not(.inboxViewToggleActive) {
+  opacity: 0.85;
+}
+
+/* --- Swipe deck --- */
+.swipeDeck {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.swipeProgressTrack {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(21, 21, 21, 0.08);
+  overflow: hidden;
+}
+
+.swipeProgressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: #b5cc2e;
+  transition: width 0.35s ease;
+}
+
+.swipeCounter {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+  color: rgba(21, 21, 21, 0.48);
+}
+
+.swipeStack {
+  position: relative;
+  width: 100%;
+  min-height: min(72vh, 560px);
+  margin-top: 4px;
+}
+
+.swipePeekWrap {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.95);
+  transform-origin: center top;
+}
+
+.swipePeekCard {
+  width: 100%;
+  max-width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(21, 21, 21, 0.1);
+  background: rgba(250, 248, 244, 0.9);
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.swipePeekType {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(21, 21, 21, 0.45);
+}
+
+.swipePeekGuest {
+  font-size: 15px;
+  font-weight: 750;
+  color: rgba(21, 21, 21, 0.65);
+}
+
+.swipeTopCard {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  touch-action: none;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+}
+
+.swipeBadgeKeep,
+.swipeBadgeDelete {
+  position: absolute;
+  top: 12px;
+  z-index: 5;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.swipeBadgeKeep {
+  left: 12px;
+  color: #14532d;
+  background: rgba(181, 204, 46, 0.95);
+  border: 1px solid rgba(21, 21, 21, 0.08);
+}
+
+.swipeBadgeDelete {
+  right: 12px;
+  color: #fff;
+  background: rgba(180, 40, 40, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.swipeKeptRibbon {
+  position: absolute;
+  top: 48px;
+  right: 12px;
+  z-index: 5;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(181, 204, 46, 0.35);
+  color: #1a1a1a;
+  pointer-events: none;
+}
+
+.swipeMediaCard {
+  width: 100%;
+  background: #0a0a0a;
+}
+
+.swipeVideoShell {
+  position: relative;
+  width: 100%;
+  min-height: min(58vh, 480px);
+  background: #000;
+}
+
+.swipeVideo {
+  width: 100%;
+  height: 100%;
+  min-height: min(58vh, 480px);
+  display: block;
+  object-fit: contain;
+  background: #000;
+}
+
+.swipeVideoOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.swipeVideoOverlayTop {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px;
+  pointer-events: auto;
+}
+
+.swipeVideoOverlayBottom {
+  padding: 16px 14px 18px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  pointer-events: none;
+}
+
+.swipeUnmute {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 750;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.swipeOverlayPrompt {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.swipeOverlayGuest {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.swipeMediaErr {
+  margin: 0;
+  padding: 24px 16px;
+  font-size: 14px;
+  color: rgba(255, 200, 200, 0.95);
+  text-align: center;
+}
+
+.swipeAudioCard {
+  padding: 18px 16px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(21, 21, 21, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: min(48vh, 400px);
+  justify-content: center;
+}
+
+.swipeAudioPrompt {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.4;
+  color: rgba(21, 21, 21, 0.72);
+  text-align: center;
+}
+
+.swipeAudioGuest {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  color: #1a1a1a;
+}
+
+.swipeAudio {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.swipeTextCard {
+  padding: 22px 18px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(21, 21, 21, 0.08);
+  min-height: min(48vh, 400px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+}
+
+.swipeTextPromptTop {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(21, 21, 21, 0.45);
+  text-align: center;
+}
+
+.swipeTextBody {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 650;
+  text-align: center;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.swipeTextFooter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: auto;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(21, 21, 21, 0.55);
+}
+
+.swipeTextDate {
+  font-weight: 650;
+  font-size: 12px;
+}
+
+.swipeActions {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.swipeBtnDelete {
+  flex: 1;
+  appearance: none;
+  border-radius: 14px;
+  border: 1px solid rgba(21, 21, 21, 0.18);
+  padding: 14px 16px;
+  font-size: 15px;
+  font-weight: 850;
+  background: rgba(255, 255, 255, 0.65);
+  color: rgba(21, 21, 21, 0.75);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.swipeBtnDelete:disabled,
+.swipeBtnKeep:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.swipeBtnKeep {
+  flex: 1;
+  appearance: none;
+  border-radius: 14px;
+  border: none;
+  padding: 14px 16px;
+  font-size: 15px;
+  font-weight: 900;
+  background: #b5cc2e;
+  color: #1a1a1a;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 8px 0 rgba(0, 0, 0, 0.06);
+}
+
+.swipeEmpty {
+  padding: 20px 0;
+  text-align: center;
+}
+
+.swipeDone {
+  padding: 32px 16px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.swipeDoneTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  color: #1a1a1a;
+}
+
+.swipeBackButton {
+  appearance: none;
+  border: 1px solid rgba(21, 21, 21, 0.15);
+  border-radius: 999px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 850;
+  background: #fff;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .checkRow {

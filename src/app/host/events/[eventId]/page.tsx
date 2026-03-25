@@ -27,6 +27,7 @@ import {
   normalizeBlirtMediaStoragePath,
 } from '../../../../lib/blirtsStoragePath';
 import { VideoFit } from '../../../../components/VideoFit';
+import { HostBlirtSwipeDeck } from '../../../../components/HostBlirtSwipeDeck';
 import {
   TextBlirtEnvelopeCard,
   type EnvelopeVariant,
@@ -83,6 +84,9 @@ function displayEventNames(a: string | null, b: string | null) {
 }
 
 const ENVELOPE_OPEN_STORAGE = 'blirt-env-opened-v1';
+
+/** Host inbox: envelopes list vs swipe deck — persisted in the browser. */
+const HOST_INBOX_VIEW_KEY = 'blirt-host-inbox-view';
 
 function loadEnvelopeOpenedIds(eventId: string): Set<string> {
   if (typeof window === 'undefined') return new Set();
@@ -168,6 +172,7 @@ export default function HostEventManagePage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   /** Inbox: export/delete/help hidden until "Manage collection" is opened. */
   const [collectionToolsOpen, setCollectionToolsOpen] = useState(false);
+  const [inboxView, setInboxView] = useState<'envelopes' | 'swipe'>('envelopes');
   const [viewerBlirt, setViewerBlirt] = useState<BlirtRow | null>(null);
   const [openEnvelopeIds, setOpenEnvelopeIds] = useState<Set<string>>(() => new Set());
   const [envelopeCollapsedIds, setEnvelopeCollapsedIds] = useState<Set<string>>(() => new Set());
@@ -255,6 +260,23 @@ export default function HostEventManagePage() {
   useEffect(() => {
     loadBlirts();
   }, [loadBlirts]);
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(HOST_INBOX_VIEW_KEY);
+      if (v === 'swipe' || v === 'envelopes') setInboxView(v);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HOST_INBOX_VIEW_KEY, inboxView);
+    } catch {
+      /* ignore */
+    }
+  }, [inboxView]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -395,10 +417,27 @@ export default function HostEventManagePage() {
     }, 1120);
   }
 
-  async function deleteBlirt(b: BlirtRow, opts?: { confirmMessage?: string }) {
+  async function keepBlirt(b: BlirtRow): Promise<boolean> {
+    if (!supabase) return false;
+    const st = (b.status ?? '').toLowerCase();
+    if (st === 'kept') return true;
+    setBusyId(b.id);
+    const { error } = await supabase.from('blirts').update({ status: 'kept' }).eq('id', b.id);
+    setBusyId(null);
+    if (error) {
+      window.alert(error.message);
+      return false;
+    }
+    await loadBlirts();
+    return true;
+  }
+
+  async function deleteBlirt(b: BlirtRow, opts?: { confirmMessage?: string; skipConfirm?: boolean }) {
     if (!supabase || bulkDeleting) return;
-    const ok = window.confirm(opts?.confirmMessage ?? 'Delete this Blirt permanently?');
-    if (!ok) return;
+    if (!opts?.skipConfirm) {
+      const ok = window.confirm(opts?.confirmMessage ?? 'Delete this Blirt permanently?');
+      if (!ok) return;
+    }
     setBusyId(b.id);
     const t = (b.type || '').toLowerCase();
     const mediaPath = normalizeBlirtMediaStoragePath(b.content);
@@ -873,6 +912,30 @@ export default function HostEventManagePage() {
               Manage collection {collectionToolsOpen ? '↑' : '↓'}
             </button>
           </div>
+          <div className={styles.inboxViewToggle} role="tablist" aria-label="Inbox layout">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={inboxView === 'envelopes'}
+              className={`${styles.inboxViewToggleOpt} ${
+                inboxView === 'envelopes' ? styles.inboxViewToggleActive : ''
+              }`}
+              onClick={() => setInboxView('envelopes')}
+            >
+              💌 Envelopes
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={inboxView === 'swipe'}
+              className={`${styles.inboxViewToggleOpt} ${
+                inboxView === 'swipe' ? styles.inboxViewToggleActive : ''
+              }`}
+              onClick={() => setInboxView('swipe')}
+            >
+              📱 Swipe
+            </button>
+          </div>
           {collectionToolsOpen ? (
             <div
               className={styles.collectionManagePanel}
@@ -983,10 +1046,11 @@ export default function HostEventManagePage() {
             </div>
           ) : null}
 
-          {blirts.length === 0 ? (
-            <p className={styles.muted}>Nothing yet—share your guest link.</p>
-          ) : (
-            blirts.map((b) => {
+          {inboxView === 'envelopes' ? (
+            blirts.length === 0 ? (
+              <p className={styles.muted}>Nothing yet—share your guest link.</p>
+            ) : (
+              blirts.map((b) => {
               const t = (b.type || '').toLowerCase();
               const url = mediaUrls[b.id];
               const guest = (b.guest_name ?? '').trim();
@@ -1093,6 +1157,19 @@ export default function HostEventManagePage() {
                 </div>
               );
             })
+            )
+          ) : (
+            <HostBlirtSwipeDeck
+              blirts={blirts}
+              mediaUrls={mediaUrls}
+              mediaUrlErrors={mediaUrlErrors}
+              busyId={busyId}
+              onKeep={keepBlirt}
+              onDelete={async (b) => {
+                await deleteBlirt(b, { skipConfirm: true });
+              }}
+              onBackToEnvelopes={() => setInboxView('envelopes')}
+            />
           )}
         </div>
       )}

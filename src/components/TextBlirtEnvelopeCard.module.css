@@ -2,6 +2,8 @@
 
 .wrap {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   text-align: left;
 }
 
@@ -76,14 +78,14 @@
   color: rgba(26, 26, 26, 0.4);
 }
 
-/* —— Open stage —— */
+/* —— Open stage —— (single cream surface; flap sits above letter content) */
 
 .openRoot {
   margin-top: 0;
   padding: 0;
   border: 1px solid rgba(26, 26, 26, 0.1);
   border-radius: 14px;
-  background: #fafafa;
+  background: #faf8f4;
   overflow: hidden;
 }
 
@@ -94,17 +96,16 @@
   perspective: 960px;
   perspective-origin: 50% 0%;
   transform-style: preserve-3d;
-  padding: 16px 16px 0;
+  padding: 12px 18px 0;
   pointer-events: none;
 }
 
 .pocket {
   position: relative;
   min-height: 128px;
-  border-radius: 10px 10px 0 0;
-  background: #ffffff;
-  border: 1px solid #e8e8e8;
-  border-bottom: none;
+  border-radius: 0;
+  background: transparent;
+  border: none;
   overflow: visible;
   transform-style: preserve-3d;
 }
@@ -127,10 +128,10 @@
 .flapInner {
   position: absolute;
   inset: 0;
-  background: #ffffff;
+  background: #f3f1ed;
   clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
-  border: 1px solid #e8e8e8;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
 }
 
 .flapShade {
@@ -169,12 +170,17 @@
   }
 }
 
-.letter {
+/* One content block: full width, comfortable padding — no inner “card on card” */
+.letterSurface {
   position: relative;
   z-index: 2;
-  margin: 32px 14px 0;
-  padding: 0;
-  border-radius: 12px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 28px 0 0;
+  padding: 0 0 18px;
+  border-radius: 0;
   background: transparent;
   border: none;
   box-shadow: none;
@@ -182,34 +188,32 @@
   pointer-events: auto;
 }
 
-.letterSheet {
-  position: relative;
-  padding: 26px 28px 28px;
-  border-radius: 12px;
-  background: #faf8f4;
-  border: 1px solid rgba(26, 26, 26, 0.08);
-  box-shadow:
-    0 2px 4px rgba(26, 26, 26, 0.04),
-    0 12px 36px rgba(26, 26, 26, 0.1),
-    0 1px 0 rgba(255, 255, 255, 0.85) inset;
+.letterMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(26, 26, 26, 0.55);
 }
 
-.letterSheet::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0.14;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E");
+.letterMetaGuest {
+  font-weight: 700;
+  color: rgba(26, 26, 26, 0.82);
 }
 
-.sceneInstant .letter {
+.letterMetaTime {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.sceneInstant .letterSurface {
   transform: translateY(0);
 }
 
-.scenePlay .letter {
+.scenePlay .letterSurface {
   transform: translateY(78%);
   animation: letterRise 0.64s cubic-bezier(0.33, 1, 0.32, 1) 0.4s forwards;
 }
@@ -224,35 +228,62 @@
 }
 
 .prompt {
-  font-size: 11px;
-  line-height: 1.5;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(26, 26, 26, 0.38);
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin: 0 0 14px;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(26, 26, 26, 0.42);
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
 }
 
-.prompt span {
+.promptLabel {
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.promptEm {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.7;
+}
+
+/* Prompt line text wraps as normal sentences (not one word per line on narrow screens) */
+.promptText {
+  font-weight: 650;
+  letter-spacing: 0.06em;
 }
 
 .body {
   margin: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   font-size: 16px;
   line-height: 1.6;
   color: #1a1a1a;
   white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
   font-family: var(--font-ui, 'DM Sans', system-ui, sans-serif);
 }
 
 .footer {
   position: relative;
   z-index: 4;
-  padding: 16px 18px 18px;
-  background: rgba(250, 248, 244, 0.85);
-  border-top: 1px solid rgba(26, 26, 26, 0.06);
+  padding: 14px 18px 16px;
+  background: transparent;
+  border-top: 1px solid rgba(26, 26, 26, 0.08);
   pointer-events: auto;
 }
 
@@ -287,13 +318,14 @@
 
 .statusPill {
   display: inline-block;
-  margin-top: 12px;
-  padding: 4px 10px;
+  margin: 0;
+  padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  background: rgba(26, 26, 26, 0.06);
+  vertical-align: baseline;
+  background: rgba(26, 26, 26, 0.07);
   color: rgba(26, 26, 26, 0.65);
 }

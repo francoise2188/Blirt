@@ -162,18 +162,26 @@ export function TextBlirtEnvelopeCard({
               <div className={styles.flapInner} />
               <div className={styles.flapShade} />
             </div>
-            <div className={styles.letter}>
-              <div className={styles.letterSheet}>
-                {promptLine ? (
-                  <p className={styles.prompt}>
-                    <span>Prompt</span> — {promptLine}
-                  </p>
+            <div className={styles.letterSurface}>
+              <div className={styles.letterMeta}>
+                <span className={styles.letterMetaGuest}>{guest || 'A friend'}</span>
+                {timeLabel ? (
+                  <time className={styles.letterMetaTime} dateTime={blirt.created_at ?? undefined}>
+                    {timeLabel}
+                  </time>
                 ) : null}
-                <p className={styles.body}>{blirt.content}</p>
                 {reviewed ? (
                   <span className={styles.statusPill}>{st === 'kept' ? 'Kept' : 'Skipped'}</span>
                 ) : null}
               </div>
+              {promptLine ? (
+                <p className={styles.prompt}>
+                  <span className={styles.promptLabel}>Prompt</span>
+                  <span className={styles.promptEm}> — </span>
+                  <span className={styles.promptText}>{promptLine}</span>
+                </p>
+              ) : null}
+              <p className={styles.body}>{blirt.content}</p>
             </div>
           </div>
         </div>

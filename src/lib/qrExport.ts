@@ -55,9 +55,8 @@ export function downloadPngDataUrl(dataUrl: string, filename: string) {
   a.href = dataUrl;
   a.download = filename;
   a.rel = 'noopener';
-  document.body.appendChild(a);
+  // Detached anchor only — avoids append/remove on body racing React / Next font <link> cleanup.
   a.click();
-  a.remove();
 }
 
 export function openQrPrintSheet(opts: {
