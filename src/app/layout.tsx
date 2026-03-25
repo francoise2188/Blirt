@@ -17,8 +17,9 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: 'Blirt',
-  description: 'Skip the speech. Leave a Blirt.',
+  title: { default: 'Blirt', template: '%s · Blirt' },
+  description:
+    'The realest part of any celebration. Guests leave video, voice, or text Blirts from their phones — no app required.',
 };
 
 export default function RootLayout({

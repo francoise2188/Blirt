@@ -922,14 +922,6 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
         </button>
       </div>
 
-      {eventId === 'demo' && (
-        <div className={styles.demoBanner} role="status">
-          <strong>Practice mode:</strong> this page is not tied to a real event, so nothing is
-          saved to Supabase. Add <code className={styles.demoCode}>?event=YOUR_EVENT_ID</code> to
-          the URL to save real Blirts.
-        </div>
-      )}
-
       {eventId !== 'demo' && eventError && (
         <div className={styles.errorBox} role="alert">
           {eventError}
@@ -1261,8 +1253,16 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
         </div>
       ) : null}
 
-      <div className={styles.bottomWordmark} aria-hidden="true">
-        Blirt
+      <div className={styles.pageFooter}>
+        {eventId === 'demo' ? (
+          <p className={styles.demoNote} role="status">
+            ✨ You&apos;re in demo mode — this is just a preview. Scan a real event QR code to leave a Blirt that
+            counts.
+          </p>
+        ) : null}
+        <div className={styles.bottomWordmark} aria-hidden="true">
+          Blirt
+        </div>
       </div>
     </div>
   );

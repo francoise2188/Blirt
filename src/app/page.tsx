@@ -1,35 +1,207 @@
+import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import styles from './page.module.css';
 
+const PRICING_FEATURES = [
+  'Unlimited guest Blirts',
+  'Video, voice, and text messages',
+  'Private host dashboard',
+  'Swipe or envelope inbox view',
+  'Keepsake PDF collection',
+  'Your QR code, ready in minutes',
+  'No app download for guests',
+] as const;
+
+const CELEBRATION_EVENTS = [
+  { emoji: '💍', label: 'Wedding' },
+  { emoji: '🎂', label: 'Birthday' },
+  { emoji: '🥂', label: 'Anniversary' },
+  { emoji: '👰', label: 'Bachelorette' },
+  { emoji: '🍾', label: 'Rehearsal Dinner' },
+  { emoji: '👶', label: 'Baby Shower' },
+  { emoji: '🎓', label: 'Graduation' },
+  { emoji: '🎉', label: 'Any celebration' },
+] as const;
+
+export const metadata: Metadata = {
+  title: 'Blirt — The realest part of any celebration',
+  description:
+    'Guests leave private video, voice, or text messages from their phones — straight to you. No app. No booth.',
+};
+
 export default function HomePage() {
   return (
-    <main className={styles.main}>
-      <div className={styles.card}>
-        <div className={styles.wordmark}>Blirt</div>
-        <h1 className={styles.title}>Skip the speech. Leave a Blirt.</h1>
-        <p className={styles.subtitle}>
-          Guests leave a Blirt from their phone. Hosts sign in to manage prompts, QR codes, and
-          exports.
-        </p>
+    <div className={styles.page}>
+      <section className={`${styles.hero} ${styles.grainBand}`} aria-labelledby="landing-headline">
+        <div className={styles.heroContent}>
+          <p className={styles.wordmark}>Blirt</p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
-          <Link href="/guest?event=demo" className={styles.startButton}>
-            Try guest (demo)
-          </Link>
-          <Link
-            href="/login"
-            className={styles.startButton}
-            style={{
-              background: 'rgba(21,21,21,0.08)',
-              color: 'inherit',
-              boxShadow: 'none',
-            }}
-          >
-            Host login
-          </Link>
+          <h1 id="landing-headline" className={styles.headline}>
+            The realest part of any celebration.
+          </h1>
+
+          <p className={styles.subhead}>
+            Guests leave private video, voice, or text messages from their phones — straight to you.
+            <br />
+            No app. No booth. Just the good stuff.
+          </p>
+
+          <div className={styles.ctaRow}>
+            <Link href="/guest" className={styles.btnPrimary}>
+              Try it — leave a demo Blirt
+            </Link>
+            <Link href="/login" className={styles.btnSecondary}>
+              Create your event
+            </Link>
+          </div>
         </div>
-      </div>
-    </main>
+
+        <div className={styles.phoneStage} aria-hidden="true">
+          <div className={styles.phoneFrame}>
+            <div className={styles.phoneNotch} />
+            <div className={styles.phoneScreen}>
+              <div className={styles.phoneImageWrap}>
+                <Image
+                  src="/landing-guest-phone.png"
+                  alt=""
+                  fill
+                  className={styles.phoneImage}
+                  sizes="220px"
+                  priority
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={styles.howItWorks} aria-labelledby="how-heading">
+        <div className={styles.howCard}>
+          <h2 id="how-heading" className={styles.howEyebrow}>
+            How it works
+          </h2>
+          <ol className={styles.howSteps}>
+            <li className={styles.howStep}>
+              <span className={styles.howEmoji} aria-hidden>
+                ✨
+              </span>
+              <h3 className={styles.howStepTitle}>Set it up in 2 minutes</h3>
+              <p className={styles.howStepBody}>
+                Pick your prompts, choose your event type, and get your QR code. Done.
+              </p>
+            </li>
+            <li className={styles.howStep}>
+              <span className={styles.howEmoji} aria-hidden>
+                📲
+              </span>
+              <h3 className={styles.howStepTitle}>Guests leave a Blirt</h3>
+              <p className={styles.howStepBody}>
+                They scan, tap record or write, and send. No app download. No account. Just 20 seconds of their
+                time.
+              </p>
+            </li>
+            <li className={styles.howStep}>
+              <span className={styles.howEmoji} aria-hidden>
+                💛
+              </span>
+              <h3 className={styles.howStepTitle}>Keep what you love</h3>
+              <p className={styles.howStepBody}>
+                Review privately, keep the ones that matter, skip the rest. Yours forever.
+              </p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section className={`${styles.whatsBlirt} ${styles.grainBand}`} aria-labelledby="whats-blirt-heading">
+        <div className={styles.whatsBlirtInner}>
+          <h2 id="whats-blirt-heading" className={styles.whatsBlirtTitle}>
+            What&apos;s a Blirt, exactly?
+          </h2>
+          <p className={styles.whatsBlirtBody}>
+            It&apos;s what happens when you give someone a quiet moment, a good prompt, and their own phone.
+            Forget the designated booth. Forget performing for a crowd. A Blirt is the thing your best friend
+            says when she sneaks away from the dance floor at 10pm and just... tells you how she really feels.
+          </p>
+
+          <div className={styles.promptScrollWrap}>
+            <ul className={styles.promptScroll} aria-label="Example prompts">
+              <li className={styles.promptCard}>
+                What&apos;s one thing you&apos;ve always wanted to say to them?
+              </li>
+              <li className={styles.promptCard}>
+                Give us your best twerk. Commit to it. 😂
+              </li>
+              <li className={styles.promptCard}>
+                Sing a song that reminds you of them. Any song. Go.
+              </li>
+            </ul>
+            <div className={styles.promptScrollHint} aria-hidden="true">
+              <span className={styles.promptScrollArrow}>→</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={`${styles.celebrations} ${styles.grainBand}`} aria-labelledby="celebrations-heading">
+        <div className={styles.celebrationsInner}>
+          <h2 id="celebrations-heading" className={styles.celebrationsTitle}>
+            Whatever you&apos;re celebrating.
+          </h2>
+          <p className={styles.celebrationsSub}>
+            Blirt works for any event where people love each other and have things to say.
+          </p>
+          <ul className={styles.eventPills} role="list">
+            {CELEBRATION_EVENTS.map(({ emoji, label }) => (
+              <li key={label} className={styles.eventPill}>
+                <span className={styles.eventPillEmoji} aria-hidden>
+                  {emoji}
+                </span>
+                {label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className={`${styles.pricing} ${styles.grainBand}`} aria-labelledby="pricing-heading">
+        <div className={styles.pricingInner}>
+          <div className={styles.pricingCard}>
+            <h2 id="pricing-heading" className={styles.pricingEyebrow}>
+              Pricing
+            </h2>
+            <div className={styles.pricingAmount}>
+              <span className={styles.priceValue}>$29</span>
+              <span className={styles.priceUnit}>per event</span>
+            </div>
+            <ul className={styles.pricingFeatures}>
+              {PRICING_FEATURES.map((line) => (
+                <li key={line} className={styles.pricingFeature}>
+                  <span className={styles.pricingCheck} aria-hidden>
+                    ✓
+                  </span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+            <p className={styles.launchBadge}>
+              🎉 Launch pricing — price increases as we grow
+            </p>
+            <Link href="/login" className={styles.pricingCta}>
+              Create your event — $29
+            </Link>
+            <p className={styles.pricingFootnote}>One time. No subscription. No surprises.</p>
+          </div>
+        </div>
+      </section>
+
+      <footer className={styles.landingFooter}>
+        <p className={styles.footerWordmark}>Blirt</p>
+        <p className={styles.footerDomain}>blirt-it.com</p>
+        <p className={styles.footerSocial}>@blirtit on Instagram &amp; TikTok</p>
+        <p className={styles.footerMade}>Made with 💛 in Austin, TX</p>
+      </footer>
+    </div>
   );
 }
-

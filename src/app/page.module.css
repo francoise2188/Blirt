@@ -1,62 +1,775 @@
-.main {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px 16px;
+/* Marketing landing — mobile first; matches app tokens (#FAF8F4, #B5CC2E, #1a1a1a) */
+
+.page {
+  width: 100%;
+  min-height: 100dvh;
+  background: #faf8f4;
+  color: #1a1a1a;
 }
 
-.card {
+/* Extra grain layer on hero + alternating bands (see .grainBand) */
+.hero {
+  min-height: 100dvh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: max(20px, env(safe-area-inset-top)) 20px 0;
+  text-align: center;
+}
+
+.heroContent {
   width: 100%;
   max-width: 520px;
-  text-align: center;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.35);
-  border: 1px solid rgba(21, 21, 21, 0.08);
-  padding: 26px 18px;
-  backdrop-filter: blur(6px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
 }
 
 .wordmark {
+  margin: 0 0 20px;
   font-family: var(--font-blirt, 'Fraunces', Georgia, serif);
-  font-size: 48px;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  margin-bottom: 12px;
-}
-
-.title {
-  font-size: 22px;
-  line-height: 1.25;
-  margin: 0;
+  font-size: clamp(44px, 12vw, 56px);
   font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: #1a1a1a;
 }
 
-.subtitle {
-  margin: 10px 0 18px;
-  color: var(--muted);
-  font-size: 14px;
+.headline {
+  margin: 0 0 16px;
+  max-width: min(92vw, 22rem);
+  font-family: var(--font-ui, 'DM Sans', system-ui, sans-serif);
+  font-size: clamp(26px, 6.8vw, 34px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #1a1a1a;
 }
 
-.startButton {
+.subhead {
+  margin: 0 0 28px;
+  max-width: 36ch;
+  font-size: 15px;
+  line-height: 1.55;
+  font-weight: 500;
+  color: rgba(26, 26, 26, 0.58);
+}
+
+.ctaRow {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.btnPrimary,
+.btnSecondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 16px 18px;
-  border-radius: 16px;
-  text-decoration: none;
-  background: var(--accent);
-  color: #161616;
+  padding: 16px 22px;
+  border-radius: 999px;
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: 0.01em;
-  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.08);
+  text-decoration: none;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btnPrimary {
+  background: #b5cc2e;
+  color: #1a1a1a;
+  border: 1px solid rgba(26, 26, 26, 0.1);
+  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.07);
+}
+
+.btnPrimary:active {
+  transform: translateY(3px);
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.06);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btnPrimary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 13px 0 rgba(0, 0, 0, 0.08);
+  }
+
+  .btnPrimary:hover:active {
+    transform: translateY(3px);
+    box-shadow: 0 5px 0 rgba(0, 0, 0, 0.06);
+  }
+}
+
+.btnSecondary {
+  background: rgba(255, 255, 255, 0.45);
+  color: #1a1a1a;
+  border: 1px solid rgba(26, 26, 26, 0.18);
+  box-shadow: none;
+}
+
+.btnSecondary:active {
+  transform: scale(0.99);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btnSecondary:hover {
+    background: rgba(255, 255, 255, 0.78);
+    border-color: rgba(26, 26, 26, 0.24);
+    transform: translateY(-1px);
+  }
+}
+
+/* Phone mockup — fixed size, top-cropped screenshot (overlaps into belowFold) */
+.phoneStage {
+  width: 220px;
+  max-width: 220px;
+  margin: 28px auto 0;
+  position: relative;
+  z-index: 2;
   transform: translateY(0);
-  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+  margin-bottom: min(-10vh, -56px);
 }
 
-.startButton:active {
-  transform: translateY(4px);
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.06);
-  filter: brightness(0.98);
+.phoneFrame {
+  position: relative;
+  width: 220px;
+  height: 420px;
+  max-height: 420px;
+  padding: 10px 10px 12px;
+  border-radius: 36px;
+  background: linear-gradient(160deg, #2a2a2a 0%, #121212 100%);
+  box-shadow:
+    0 24px 48px rgba(26, 26, 26, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
+.phoneNotch {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 14px;
+  background: #0a0a0a;
+  border-radius: 0 0 10px 10px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.phoneScreen {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  border-radius: 26px;
+  overflow: hidden;
+  background: #faf8f4;
+}
+
+.phoneImageWrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+/* Screenshot only: scaled down from top; clipping is from .phoneScreen / .phoneImageWrap overflow */
+.phoneImage {
+  object-fit: cover;
+  object-position: top center;
+  transform: scale(0.9);
+  transform-origin: top center;
+}
+
+/* Section 2 — How it works (card sits on cream page bg) */
+.howItWorks {
+  width: 100%;
+  padding: clamp(48px, 10vh, 88px) 20px max(48px, env(safe-area-inset-bottom));
+  background: #faf8f4;
+}
+
+.howCard {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 28px 22px 32px;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  box-shadow: 0 10px 36px rgba(26, 26, 26, 0.06);
+}
+
+.howEyebrow {
+  margin: 0 0 24px;
+  font-family: var(--font-ui, 'DM Sans', system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  color: rgba(26, 26, 26, 0.45);
+}
+
+.howSteps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.howStep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.howEmoji {
+  display: block;
+  font-size: 40px;
+  line-height: 1;
+}
+
+.howStepTitle {
+  margin: 0;
+  font-family: var(--font-ui, 'DM Sans', system-ui, sans-serif);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #1a1a1a;
+}
+
+.howStepBody {
+  margin: 0;
+  max-width: 36ch;
+  font-size: 15px;
+  line-height: 1.55;
+  font-weight: 500;
+  color: rgba(26, 26, 26, 0.62);
+}
+
+@media (min-width: 640px) {
+  .hero {
+    padding-top: max(32px, env(safe-area-inset-top));
+  }
+
+  .headline {
+    max-width: 24ch;
+  }
+
+  .subhead {
+    font-size: 16px;
+    max-width: 40ch;
+  }
+
+  .ctaRow {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+  }
+
+  .btnPrimary,
+  .btnSecondary {
+    width: auto;
+    min-width: 220px;
+  }
+
+  .phoneStage {
+    margin-top: 36px;
+    margin-bottom: min(-8vh, -48px);
+  }
+}
+
+@media (min-width: 900px) {
+  .howSteps {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 32px;
+  }
+
+  .howStep {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .howStepBody {
+    max-width: none;
+  }
+
+  .howCard {
+    padding: 36px 40px 40px;
+  }
+}
+
+/* Section 3 — What's a Blirt (warm, off-white) */
+.whatsBlirt {
+  width: 100%;
+  padding: clamp(48px, 10vh, 96px) 0 max(56px, env(safe-area-inset-bottom));
+  background: #f4f1eb;
+  color: #1a1a1a;
+}
+
+.whatsBlirtInner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.whatsBlirtTitle {
+  margin: 0 0 20px;
+  font-family: var(--font-blirt, 'Fraunces', Georgia, serif);
+  font-size: clamp(26px, 5.5vw, 34px);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #1a1a1a;
+}
+
+.whatsBlirtBody {
+  margin: 0 0 32px;
+  font-size: 17px;
+  line-height: 1.7;
+  font-weight: 500;
+  color: rgba(26, 26, 26, 0.78);
+}
+
+.promptScrollWrap {
+  position: relative;
+  margin-left: -20px;
+  margin-right: -20px;
+  width: calc(100% + 40px);
+}
+
+.promptScroll {
+  list-style: none;
+  margin: 0;
+  padding: 4px 20px 16px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 20px;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.promptScrollHint {
+  display: none;
+}
+
+.promptScrollArrow {
+  display: block;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1;
+  color: rgba(26, 26, 26, 0.32);
+  transform: translateX(1px);
+}
+
+@media (max-width: 639px) {
+  .promptScrollHint {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(64px, 18vw);
+    padding-right: 6px;
+    pointer-events: none;
+    background: linear-gradient(
+      to left,
+      #f4f1eb 0%,
+      rgba(244, 241, 235, 0.88) 38%,
+      rgba(244, 241, 235, 0) 100%
+    );
+  }
+}
+
+.promptCard {
+  flex: 0 0 min(280px, 78vw);
+  scroll-snap-align: start;
+  margin: 0;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: #faf8f4;
+  color: #1a1a1a;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  box-shadow:
+    0 1px 0 rgba(26, 26, 26, 0.06),
+    0 8px 24px rgba(26, 26, 26, 0.08);
+  border: 1px solid rgba(26, 26, 26, 0.06);
+}
+
+@media (min-width: 640px) {
+  .whatsBlirtBody {
+    font-size: 18px;
+  }
+
+  .promptScrollWrap {
+    margin-left: 0;
+    margin-right: 0;
+    width: 100%;
+  }
+
+  .promptScroll {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .promptCard {
+    flex: 0 0 260px;
+  }
+}
+
+/* Section 4 — Works for any celebration */
+.celebrations {
+  width: 100%;
+  padding: clamp(48px, 10vh, 96px) 20px max(56px, env(safe-area-inset-bottom));
+  background: #faf8f4;
+  color: #1a1a1a;
+}
+
+.celebrationsInner {
+  max-width: 920px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.celebrationsTitle {
+  margin: 0 0 12px;
+  font-family: var(--font-blirt, 'Fraunces', Georgia, serif);
+  font-size: clamp(26px, 5.5vw, 34px);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #1a1a1a;
+}
+
+.celebrationsSub {
+  margin: 0 auto 28px;
+  max-width: 42ch;
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 500;
+  color: rgba(26, 26, 26, 0.5);
+}
+
+.eventPills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px 12px;
+}
+
+.eventPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(26, 26, 26, 0.22);
+  background: transparent;
+  color: #1a1a1a;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.eventPillEmoji {
+  font-size: 16px;
+  line-height: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .eventPill:hover {
+    background: #b5cc2e;
+    border-color: #b5cc2e;
+  }
+}
+
+.eventPill:active {
+  background: #b5cc2e;
+  border-color: #b5cc2e;
+  transform: scale(0.98);
+}
+
+@media (min-width: 640px) {
+  .celebrationsSub {
+    font-size: 15px;
+    margin-bottom: 32px;
+  }
+
+  .eventPills {
+    gap: 12px 14px;
+  }
+
+  .eventPill {
+    padding: 11px 18px;
+    font-size: 15px;
+  }
+}
+
+/* Grain overlay — layers with global body grain; keeps hero & alternating sections tactile */
+.grainBand {
+  position: relative;
+}
+
+.grainBand::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.12;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E");
+}
+
+.grainBand > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Section 5 — Pricing */
+.pricing {
+  width: 100%;
+  padding: clamp(48px, 10vh, 96px) 20px max(48px, env(safe-area-inset-bottom));
+  background: #faf8f4;
+  color: #1a1a1a;
+}
+
+.pricingInner {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.pricingCard {
+  padding: 32px 24px 36px;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  box-shadow: 0 10px 40px rgba(26, 26, 26, 0.07);
+  text-align: center;
+}
+
+.pricingEyebrow {
+  margin: 0 0 20px;
+  font-family: var(--font-ui, 'DM Sans', system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(26, 26, 26, 0.45);
+}
+
+.pricingAmount {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 28px;
+}
+
+.priceValue {
+  font-family: var(--font-blirt, 'Fraunces', Georgia, serif);
+  font-size: clamp(48px, 14vw, 64px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: #1a1a1a;
+}
+
+.priceUnit {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(26, 26, 26, 0.48);
+}
+
+.pricingFeatures {
+  list-style: none;
+  margin: 0 auto 24px;
+  padding: 0;
+  max-width: 22rem;
+  text-align: left;
+}
+
+.pricingFeature {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: rgba(26, 26, 26, 0.82);
+}
+
+.pricingFeature:last-child {
+  margin-bottom: 0;
+}
+
+.pricingCheck {
+  flex-shrink: 0;
+  width: 1.1em;
+  font-weight: 800;
+  color: #b5cc2e;
+  line-height: 1.45;
+}
+
+.launchBadge {
+  margin: 0 0 22px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  display: inline-block;
+  max-width: 100%;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1a1a1a;
+  background: rgba(181, 204, 46, 0.38);
+  border: 1px solid rgba(181, 204, 46, 0.55);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.pricingCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  padding: 16px 22px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  background: #b5cc2e;
+  color: #1a1a1a;
+  border: 1px solid rgba(26, 26, 26, 0.1);
+  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.07);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pricingCta:active {
+  transform: translateY(3px);
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.06);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pricingCta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 13px 0 rgba(0, 0, 0, 0.08);
+  }
+
+  .pricingCta:hover:active {
+    transform: translateY(3px);
+    box-shadow: 0 5px 0 rgba(0, 0, 0, 0.06);
+  }
+}
+
+.pricingFootnote {
+  margin: 16px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: rgba(26, 26, 26, 0.48);
+}
+
+@media (min-width: 640px) {
+  .pricingCard {
+    padding: 40px 40px 44px;
+  }
+
+  .pricingFeature {
+    font-size: 16px;
+  }
+
+  .pricingCta {
+    max-width: none;
+    width: auto;
+    min-width: 280px;
+  }
+}
+
+/* Section 6 — Footer */
+.landingFooter {
+  width: 100%;
+  padding: 40px 20px max(32px, env(safe-area-inset-bottom));
+  text-align: center;
+  background: #faf8f4;
+  border-top: 1px solid rgba(26, 26, 26, 0.06);
+  color: #1a1a1a;
+}
+
+.footerWordmark {
+  margin: 0 0 10px;
+  font-family: var(--font-blirt, 'Fraunces', Georgia, serif);
+  font-size: clamp(32px, 8vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: #1a1a1a;
+}
+
+.footerDomain {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(26, 26, 26, 0.45);
+}
+
+.footerSocial {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(26, 26, 26, 0.45);
+}
+
+.footerMade {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(26, 26, 26, 0.4);
+}
