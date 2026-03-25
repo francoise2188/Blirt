@@ -851,6 +851,25 @@
   width: 100%;
 }
 
+/* Mobile: keep Stop/Cancel button always visible (fixed). */
+@media (max-width: 560px) {
+  .videoStageBottomBar {
+    /* Leave space so hints never sit behind the fixed button */
+    padding-bottom: calc(24px + 56px + max(18px, env(safe-area-inset-bottom)));
+  }
+
+  .videoStageBottomBar .bigCta {
+    position: fixed;
+    bottom: 24px;
+    left: 16px;
+    right: 16px;
+    z-index: 50;
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
 /* Mirror selfie preview so it feels like a phone camera (recording file is unchanged). */
 .liveVideoMirror {
   transform: scaleX(-1);
