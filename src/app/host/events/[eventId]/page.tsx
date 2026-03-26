@@ -29,13 +29,17 @@ import {
 import { VideoFit } from '../../../../components/VideoFit';
 import { HostBlirtSwipeDeck } from '../../../../components/HostBlirtSwipeDeck';
 import {
+  HostSoundtrackTab,
+  formatPlaylistEventDate,
+} from '../../../../components/HostSoundtrackTab';
+import {
   TextBlirtEnvelopeCard,
   type EnvelopeVariant,
 } from '../../../../components/TextBlirtEnvelopeCard';
 import { getPromptLibraryForEventType } from '../../../../lib/promptLibrary';
 import styles from '../../host.module.css';
 
-type Tab = 'blirts' | 'share' | 'prompts';
+type Tab = 'blirts' | 'share' | 'prompts' | 'soundtrack';
 
 type EventRow = {
   id: string;
@@ -44,6 +48,7 @@ type EventRow = {
   /** Pretty guest path: /ashley-birthday */
   guest_slug?: string | null;
   event_type?: string | null;
+  event_date?: string | null;
   prompts: string[] | null;
   prompt_randomize: boolean | null;
   /** Legacy / alternate host column */
@@ -212,6 +217,30 @@ export default function HostEventManagePage() {
     [event?.partner_1, event?.partner_2],
   );
 
+  const hasAnySoundtrackBlirt = useMemo(
+    () => blirts.some((b) => (b.type || '').toLowerCase() === 'soundtrack'),
+    [blirts],
+  );
+
+  const keptSoundtrackBlirts = useMemo(() => {
+    return blirts
+      .filter(
+        (b) =>
+          (b.type || '').toLowerCase() === 'soundtrack' &&
+          (b.status ?? '').toLowerCase() === 'kept',
+      )
+      .sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return ta - tb;
+      });
+  }, [blirts]);
+
+  const playlistEventDateLine = useMemo(
+    () => formatPlaylistEventDate(event?.event_date ?? null),
+    [event?.event_date],
+  );
+
   const loadBlirts = useCallback(async () => {
     if (!supabase || !eventId) return;
     const { data, error } = await supabase
@@ -286,6 +315,10 @@ export default function HostEventManagePage() {
       /* ignore */
     }
   }, [inboxView]);
+
+  useEffect(() => {
+    if (tab === 'soundtrack' && !hasAnySoundtrackBlirt) setTab('blirts');
+  }, [tab, hasAnySoundtrackBlirt]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -908,6 +941,15 @@ export default function HostEventManagePage() {
         >
           Prompts &amp; themes
         </button>
+        {hasAnySoundtrackBlirt ? (
+          <button
+            type="button"
+            className={`${styles.tab} ${tab === 'soundtrack' ? styles.tabActive : ''}`}
+            onClick={() => setTab('soundtrack')}
+          >
+            🎵 Soundtrack ({keptSoundtrackBlirts.length})
+          </button>
+        ) : null}
       </div>
 
       {tab === 'blirts' && (
@@ -1558,6 +1600,17 @@ export default function HostEventManagePage() {
           </button>
         </div>
       )}
+
+      {tab === 'soundtrack' && hasAnySoundtrackBlirt ? (
+        <HostSoundtrackTab
+          eventTitle={eventTitleForFiles}
+          eventDateLine={playlistEventDateLine}
+          keptSoundtracks={keptSoundtrackBlirts}
+          hasAnySoundtrackSubmission={hasAnySoundtrackBlirt}
+          mediaUrls={mediaUrls}
+          mediaUrlErrors={mediaUrlErrors}
+        />
+      ) : null}
     </div>
   );
 }

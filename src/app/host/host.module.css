@@ -1330,3 +1330,254 @@
   border-radius: 999px;
   background: rgba(21, 21, 21, 0.08);
 }
+
+/* Host event — Soundtrack tab */
+.soundtrackTabTitle {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #1a1a1a;
+}
+
+.soundtrackTabSub {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(26, 26, 26, 0.55);
+}
+
+.soundtrackEmpty {
+  margin: 0 0 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: rgba(26, 26, 26, 0.65);
+  text-align: center;
+  padding: 20px 8px;
+}
+
+.soundtrackList {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.soundtrackListItem {
+  padding-bottom: 14px;
+}
+
+.soundtrackListItemWithRule {
+  border-bottom: 1px solid rgba(26, 26, 26, 0.1);
+  margin-bottom: 14px;
+}
+
+.soundtrackRowTop {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.soundtrackRowTop:focus-visible {
+  outline: 2px solid rgba(181, 204, 46, 0.9);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.soundtrackRowArtWrap {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+}
+
+.soundtrackRowArt {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+  background: rgba(26, 26, 26, 0.06);
+}
+
+.soundtrackRowArtFallback {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(26, 26, 26, 0.12), rgba(26, 26, 26, 0.06));
+}
+
+.soundtrackRowText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.soundtrackRowTitle {
+  font-size: 15px;
+  font-weight: 800;
+  color: #1a1a1a;
+  line-height: 1.3;
+  margin-bottom: 2px;
+}
+
+.soundtrackRowArtist {
+  font-size: 13px;
+  color: rgba(26, 26, 26, 0.55);
+  line-height: 1.35;
+}
+
+.soundtrackRowBy {
+  margin-top: 6px;
+  font-size: 12px;
+  font-style: italic;
+  color: rgba(26, 26, 26, 0.42);
+  line-height: 1.35;
+}
+
+.soundtrackRowActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 112px;
+}
+
+.soundtrackRowPlay {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: #b5cc2e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  touch-action: manipulation;
+}
+
+.soundtrackRowPlay:active {
+  transform: scale(0.97);
+}
+
+.soundtrackRowPlayTri {
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 11px solid #1a1a1a;
+  margin-left: 2px;
+}
+
+.soundtrackRowPlayPause {
+  width: 12px;
+  height: 14px;
+  position: relative;
+}
+
+.soundtrackRowPlayPause::before,
+.soundtrackRowPlayPause::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 1px;
+  background: #1a1a1a;
+}
+
+.soundtrackRowPlayPause::before {
+  left: 0;
+}
+
+.soundtrackRowPlayPause::after {
+  right: 0;
+}
+
+.soundtrackRowSpotifyLink {
+  font-size: 12px;
+  font-weight: 750;
+  color: #1a1a1a;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.soundtrackMemory {
+  margin-top: 12px;
+  padding: 12px 0 0;
+  border-top: 1px dashed rgba(26, 26, 26, 0.12);
+}
+
+.soundtrackMemoryPrompt {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 750;
+  color: rgba(26, 26, 26, 0.55);
+}
+
+.soundtrackMemoryText {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #1a1a1a;
+  white-space: pre-wrap;
+}
+
+.soundtrackMemoryAudio {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.soundtrackCopyBtn {
+  appearance: none;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  display: block;
+  border: none;
+  border-radius: 999px;
+  padding: 14px 18px;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  background: #b5cc2e;
+  color: #1a1a1a;
+  box-shadow: 0 8px 0 rgba(0, 0, 0, 0.06);
+  touch-action: manipulation;
+}
+
+.soundtrackCopyBtn:active {
+  transform: translateY(2px);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.05);
+}
+
+.soundtrackHiddenAudio {
+  display: none;
+}
+
+.soundtrackToast {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 2000;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 12px 18px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.4;
+  text-align: center;
+  color: #1a1a1a;
+  background: #faf8f4;
+  border: 1px solid rgba(26, 26, 26, 0.12);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
