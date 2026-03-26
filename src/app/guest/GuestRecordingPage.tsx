@@ -1421,71 +1421,47 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
       </div>
 
       {showVideoFullscreen ? (
-        <>
-          <div
-            className={styles.videoFullScreenShell}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Camera"
-          >
-            <div className={styles.videoFullScreenInner}>
-              <div className={styles.liveVideoShell}>
-                <video
-                  ref={liveVideoRef}
-                  className={`${styles.liveVideo} ${
-                    videoFacing === 'user' ? styles.liveVideoMirror : ''
-                  } ${styles.liveVideoFullscreen}`}
-                  playsInline
-                  muted
-                  autoPlay
-                />
-                {!isRecording && countdown !== null && countdown > 0 ? (
-                  <button
-                    type="button"
-                    className={styles.flipCameraButton}
-                    onClick={() => void flipCameraDuringCountdown()}
-                    disabled={cameraFlipBusy}
-                    aria-label={
-                      videoFacing === 'user'
-                        ? 'Switch to camera on the back of the phone'
-                        : 'Switch to selfie camera'
-                    }
-                  >
-                    {cameraFlipBusy ? '…' : 'Flip'}
-                  </button>
-                ) : null}
-                {!isRecording && countdown !== null && countdown > 0 ? (
-                  <div className={styles.countdownOverlay} aria-live="polite">
-                    <span className={styles.countdownNumber}>{countdown}</span>
-                  </div>
-                ) : null}
-              </div>
-              <p className={styles.liveCaptionOnDark}>
-                {isRecording ? (
-                  <>
-                    Recording {formatRecordingClock(recordingElapsedSec, MAX_RECORDING_SECONDS)} — tap{' '}
-                    <strong>Stop</strong> below, or recording stops automatically at{' '}
-                    {MAX_RECORDING_SECONDS}s.
-                  </>
-                ) : (
-                  <>
-                    Get ready… Allow <strong>Camera</strong> and <strong>Microphone</strong> when your phone
-                    asks.
-                  </>
-                )}
-              </p>
+        <div
+          className={styles.videoFullScreenShell}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Camera"
+        >
+          <div className={styles.videoFullScreenInner}>
+            <div className={styles.liveVideoShell}>
+              <video
+                ref={liveVideoRef}
+                className={`${styles.liveVideo} ${
+                  videoFacing === 'user' ? styles.liveVideoMirror : ''
+                } ${styles.liveVideoFullscreen}`}
+                playsInline
+                muted
+                autoPlay
+              />
+              {!isRecording && countdown !== null && countdown > 0 ? (
+                <button
+                  type="button"
+                  className={styles.flipCameraButton}
+                  onClick={() => void flipCameraDuringCountdown()}
+                  disabled={cameraFlipBusy}
+                  aria-label={
+                    videoFacing === 'user'
+                      ? 'Switch to camera on the back of the phone'
+                      : 'Switch to selfie camera'
+                  }
+                >
+                  {cameraFlipBusy ? '…' : 'Flip'}
+                </button>
+              ) : null}
+              {!isRecording && countdown !== null && countdown > 0 ? (
+                <div className={styles.countdownOverlay} aria-live="polite">
+                  <span className={styles.countdownNumber}>{countdown}</span>
+                </div>
+              ) : null}
             </div>
-          </div>
-
-          <div className={styles.videoStageBottomBar}>
-            {recordHint ? (
-              <div className={styles.recordHint} role="status">
-                {recordHint}
-              </div>
-            ) : null}
             <button
               type="button"
-              className={styles.bigCta}
+              className={`${styles.bigCta} ${styles.videoFullscreenBigCta}`}
               onClick={handleBigButtonClick}
               disabled={
                 isSubmitting ||
@@ -1500,8 +1476,23 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
             >
               {bigButtonLabel}
             </button>
+            {isRecording ? (
+              <p className={styles.liveCaptionOnDark}>
+                Recording {formatRecordingClock(recordingElapsedSec, MAX_RECORDING_SECONDS)} — tap{' '}
+                <strong>Stop</strong> above, or recording stops automatically at {MAX_RECORDING_SECONDS}s.
+              </p>
+            ) : (
+              <p className={styles.liveCaptionOnDark}>
+                Get ready… Allow <strong>Camera</strong> and <strong>Microphone</strong> when your phone asks.
+              </p>
+            )}
+            {recordHint ? (
+              <div className={styles.recordHint} role="status">
+                {recordHint}
+              </div>
+            ) : null}
           </div>
-        </>
+        </div>
       ) : (
         <div className={styles.recordCtaStack}>
           {recordHint ? (

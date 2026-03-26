@@ -750,40 +750,37 @@
 
 .videoFullScreenShell {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  /* Space for sticky Stop / Cancel bar — avoids scroll fighting on countdown ticks */
-  bottom: calc(env(safe-area-inset-bottom) + 128px);
+  inset: 0;
   z-index: 1000;
   background: #000;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: max(10px, env(safe-area-inset-top)) 12px 8px;
+  justify-content: flex-start;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: max(10px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
 .videoFullScreenInner {
   width: 100%;
-  height: 100%;
-  max-width: 100%;
+  max-width: 520px;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+  align-items: stretch;
+  align-self: center;
+  gap: 0;
 }
 
 .videoFullScreenInner .liveVideoShell {
   flex: 0 0 auto;
   min-height: 0;
-  width: min(92vw, calc(70dvh * 9 / 16));
+  width: min(92vw, calc(55vh * 9 / 16));
   max-width: min(520px, 92vw);
   aspect-ratio: 9 / 16;
-  max-height: 70dvh;
+  max-height: 55vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -803,13 +800,25 @@
 }
 
 .liveCaptionOnDark {
-  margin: 0;
+  margin: 10px 0 0;
   font-size: 15px;
   font-weight: 750;
   text-align: center;
   color: rgba(255, 255, 255, 0.92);
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
   max-width: 420px;
+  align-self: center;
+}
+
+.videoFullscreenBigCta {
+  margin-top: 0;
+  max-width: none;
+  width: 100%;
+  align-self: stretch;
+}
+
+.videoFullScreenInner .recordHint {
+  margin-top: 10px;
 }
 
 .cancelOnDark {
@@ -824,50 +833,6 @@
   text-underline-offset: 3px;
   cursor: pointer;
   touch-action: manipulation;
-}
-
-.videoStageBottomBar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1001;
-  padding: 10px 16px max(18px, env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(250, 248, 244, 0.88) 35%,
-    rgba(250, 248, 244, 0.98) 100%
-  );
-  pointer-events: auto;
-}
-
-.videoStageBottomBar .bigCta {
-  max-width: 520px;
-  width: 100%;
-}
-
-/* Mobile: keep Stop/Cancel button always visible (fixed). */
-@media (max-width: 560px) {
-  .videoStageBottomBar {
-    /* Leave space so hints never sit behind the fixed button */
-    padding-bottom: calc(24px + 56px + max(18px, env(safe-area-inset-bottom)));
-  }
-
-  .videoStageBottomBar .bigCta {
-    position: fixed;
-    bottom: 24px;
-    left: 16px;
-    right: 16px;
-    z-index: 50;
-    max-width: 520px;
-    margin-left: auto;
-    margin-right: auto;
-  }
 }
 
 /* Mirror selfie preview so it feels like a phone camera (recording file is unchanged). */
