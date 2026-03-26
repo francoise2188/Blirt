@@ -39,6 +39,8 @@ import {
 import { getPromptLibraryForEventType } from '../../../../lib/promptLibrary';
 import styles from '../../host.module.css';
 
+const SOUNDTRACK_PROMPT = 'This song reminds me of you because...';
+
 type Tab = 'blirts' | 'share' | 'prompts' | 'soundtrack';
 
 type EventRow = {
@@ -186,6 +188,8 @@ export default function HostEventManagePage() {
   const [collectionToolsOpen, setCollectionToolsOpen] = useState(false);
   const [inboxView, setInboxView] = useState<'envelopes' | 'swipe'>('envelopes');
   const [viewerBlirt, setViewerBlirt] = useState<BlirtRow | null>(null);
+  const [viewerSoundtrackPreviewPlaying, setViewerSoundtrackPreviewPlaying] = useState(false);
+  const viewerSoundtrackPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [openEnvelopeIds, setOpenEnvelopeIds] = useState<Set<string>>(() => new Set());
   const [envelopeCollapsedIds, setEnvelopeCollapsedIds] = useState<Set<string>>(() => new Set());
   const [envelopePlayId, setEnvelopePlayId] = useState<string | null>(null);
@@ -371,6 +375,18 @@ export default function HostEventManagePage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  useEffect(() => {
+    const a = viewerSoundtrackPreviewAudioRef.current;
+    if (!viewerBlirt || (viewerBlirt.type || '').toLowerCase() !== 'soundtrack') {
+      if (a) {
+        a.pause();
+        a.removeAttribute('src');
+        a.load();
+      }
+      setViewerSoundtrackPreviewPlaying(false);
+    }
+  }, [viewerBlirt]);
 
   useEffect(() => {
     if (!supabase || !blirts.length) {
@@ -1270,103 +1286,253 @@ export default function HostEventManagePage() {
             >
               ×
             </button>
-            <div className={styles.modalMeta}>
-              <strong>{viewerBlirt.type}</strong>
-              {(viewerBlirt.guest_name ?? '').trim()
-                ? ` · From: ${(viewerBlirt.guest_name ?? '').trim()}`
-                : ' · From: a friend'}
-              <br />
-              · {viewerBlirt.status ?? '—'} ·{' '}
-              {viewerBlirt.created_at
-                ? new Date(viewerBlirt.created_at).toLocaleString()
-                : ''}
-            </div>
-            {(viewerBlirt.prompt_snapshot ?? '').trim() ? (
-              <p className={styles.modalPrompt}>
-                <span className={styles.blirtPromptLabel}>Prompt</span>{' '}
-                {(viewerBlirt.prompt_snapshot ?? '').trim()}
-              </p>
-            ) : null}
-            {(() => {
-              const vt = (viewerBlirt.type || '').toLowerCase();
-              const soundtrackKind = (viewerBlirt.soundtrack_message_type ?? '').toLowerCase();
-              if (vt === 'text') {
-                return (
-                  <div className={styles.modalBodyText} style={{ whiteSpace: 'pre-wrap' }}>
-                    {viewerBlirt.content}
-                  </div>
-                );
-              }
-              if (vt === 'soundtrack' && soundtrackKind === 'text') {
-                return (
-                  <div className={styles.modalBodyText} style={{ whiteSpace: 'pre-wrap' }}>
-                    {viewerBlirt.content}
-                  </div>
-                );
-              }
-              if (viewerMediaError) {
-                return (
-                  <p className={styles.mediaErrorHint}>
-                    {friendlyBlirtStorageError(viewerMediaError)}
-                  </p>
-                );
-              }
-              if ((vt === 'video' || (vt === 'soundtrack' && soundtrackKind === 'video')) && viewerUrl) {
-                return <VideoFit src={viewerUrl} variant="modal" />;
-              }
-              if ((vt === 'audio' || (vt === 'soundtrack' && soundtrackKind === 'audio')) && viewerUrl) {
-                return <audio src={viewerUrl} controls autoPlay className={styles.modalAudio} />;
-              }
-              return <p className={styles.muted}>Loading media…</p>;
-            })()}
-            {(() => {
-              const vt = (viewerBlirt.type || '').toLowerCase();
-              const soundtrackKind = (viewerBlirt.soundtrack_message_type ?? '').toLowerCase();
-              const nonText =
-                vt !== 'text' && !(vt === 'soundtrack' && soundtrackKind === 'text');
-              if (!viewerUrl || !nonText || viewerMediaError) return null;
-              return (
-              <a
-                className={styles.link}
-                href={viewerUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{ display: 'inline-block', marginTop: 12 }}
-              >
-                Open / download file
-              </a>
-              );
-            })()}
+            {(viewerBlirt.type || '').toLowerCase() === 'soundtrack' ? (
+              (() => {
+                const vb = viewerBlirt;
+                const soundtrackKind = (vb.soundtrack_message_type ?? '').toLowerCase();
+                const artUrl = (vb.spotify_album_art_url ?? '').trim();
+                const trackName = (vb.spotify_track_name ?? '').trim() || 'Song';
+                const artistName = (vb.spotify_artist_name ?? '').trim() || 'Artist';
+                const albumName = (vb.spotify_album_name ?? '').trim() || '—';
+                const guestLabel = (vb.guest_name ?? '').trim() || 'Guest';
+                const previewUrl = (vb.spotify_preview_url ?? '').trim();
+                const tid = (vb.spotify_track_id ?? '').trim();
+                const openSpotifyUrl = tid ? `https://open.spotify.com/track/${tid}` : null;
+                const nonTextMem = soundtrackKind !== 'text';
+                const showFileLink = Boolean(viewerUrl && nonTextMem && !viewerMediaError);
 
-            {(() => {
-              const vt = (viewerBlirt.type || '').toLowerCase();
-              const tid = (viewerBlirt.spotify_track_id ?? '').trim();
-              if (vt !== 'soundtrack' || !tid) return null;
-              const openSpotifyUrl = `https://open.spotify.com/track/${tid}`;
-              return (
-                <a
-                  className={styles.link}
-                  href={openSpotifyUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ display: 'inline-block', marginTop: 8 }}
-                >
-                  Open in Spotify
-                </a>
-              );
-            })()}
-            <div className={styles.modalFooter}>
-              <button
-                type="button"
-                className={`${styles.button} ${styles.buttonDanger}`}
-                onClick={() => {
-                  deleteBlirt(viewerBlirt);
-                }}
-                disabled={busyId === viewerBlirt.id || bulkDeleting}
-              >
-                Delete
-              </button>
-            </div>
+                return (
+                  <>
+                    <audio
+                      ref={viewerSoundtrackPreviewAudioRef}
+                      preload="none"
+                      className={styles.soundtrackHiddenAudio}
+                      aria-hidden
+                      onEnded={() => setViewerSoundtrackPreviewPlaying(false)}
+                    />
+                    <div className={styles.modalSoundtrackSongCard}>
+                      <div className={styles.modalSoundtrackSongRow}>
+                        <div className={styles.modalSoundtrackArtWrap}>
+                          {artUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={artUrl}
+                              alt=""
+                              className={styles.modalSoundtrackArt}
+                              width={56}
+                              height={56}
+                            />
+                          ) : (
+                            <div className={styles.modalSoundtrackArtFallback} aria-hidden />
+                          )}
+                        </div>
+                        <div className={styles.modalSoundtrackSongText}>
+                          <div className={styles.modalSoundtrackTrackName}>{trackName}</div>
+                          <div className={styles.modalSoundtrackArtistName}>{artistName}</div>
+                          <div className={styles.modalSoundtrackAlbumName}>{albumName}</div>
+                        </div>
+                      </div>
+                      <p className={styles.modalSoundtrackDedicated}>
+                        Dedicated by {guestLabel}
+                      </p>
+                      <div className={styles.modalSoundtrackPreviewRow}>
+                        {previewUrl ? (
+                          <button
+                            type="button"
+                            className={`${styles.soundtrackRowPlay} ${styles.modalSoundtrackPreviewBtn}`}
+                            aria-label={
+                              viewerSoundtrackPreviewPlaying
+                                ? 'Pause preview'
+                                : 'Play 30 second preview'
+                            }
+                            onClick={async () => {
+                              if (!previewUrl) return;
+                              const a = viewerSoundtrackPreviewAudioRef.current;
+                              if (!a) return;
+                              if (viewerSoundtrackPreviewPlaying) {
+                                a.pause();
+                                setViewerSoundtrackPreviewPlaying(false);
+                                return;
+                              }
+                              a.src = previewUrl;
+                              try {
+                                await a.play();
+                                setViewerSoundtrackPreviewPlaying(true);
+                              } catch {
+                                setViewerSoundtrackPreviewPlaying(false);
+                              }
+                            }}
+                          >
+                            <span
+                              className={
+                                viewerSoundtrackPreviewPlaying
+                                  ? styles.soundtrackRowPlayPause
+                                  : styles.soundtrackRowPlayTri
+                              }
+                              aria-hidden
+                            />
+                          </button>
+                        ) : null}
+                        {openSpotifyUrl ? (
+                          <a
+                            className={styles.modalSoundtrackSpotifyInline}
+                            href={openSpotifyUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Open in Spotify →
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className={styles.modalSoundtrackDivider} aria-hidden />
+
+                    <p className={styles.modalPrompt}>
+                      <span className={styles.blirtPromptLabel}>Prompt</span>{' '}
+                      {SOUNDTRACK_PROMPT}
+                    </p>
+
+                    {soundtrackKind === 'text' ? (
+                      <div className={styles.modalBodyText} style={{ whiteSpace: 'pre-wrap' }}>
+                        {vb.content}
+                      </div>
+                    ) : viewerMediaError ? (
+                      <p className={styles.mediaErrorHint}>
+                        {friendlyBlirtStorageError(viewerMediaError)}
+                      </p>
+                    ) : soundtrackKind === 'video' && viewerUrl ? (
+                      <VideoFit src={viewerUrl} variant="modal" />
+                    ) : soundtrackKind === 'audio' && viewerUrl ? (
+                      <audio src={viewerUrl} controls autoPlay className={styles.modalAudio} />
+                    ) : (
+                      <p className={styles.muted}>Loading media…</p>
+                    )}
+
+                    <div className={styles.modalSoundtrackLinkStack}>
+                      {showFileLink ? (
+                        <a
+                          className={styles.modalSoundtrackLinkLine}
+                          href={viewerUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open / download file
+                        </a>
+                      ) : null}
+                      {openSpotifyUrl ? (
+                        <a
+                          className={styles.modalSoundtrackLinkLine}
+                          href={openSpotifyUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open in Spotify →
+                        </a>
+                      ) : null}
+                    </div>
+
+                    <div className={styles.modalFooter}>
+                      {(vb.status ?? '').toLowerCase() !== 'kept' ? (
+                        <button
+                          type="button"
+                          className={styles.button}
+                          onClick={async () => {
+                            const ok = await keepBlirt(vb);
+                            if (ok) setViewerBlirt(null);
+                          }}
+                          disabled={busyId === vb.id || bulkDeleting}
+                        >
+                          Keep
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={`${styles.button} ${styles.buttonDanger}`}
+                        onClick={() => {
+                          deleteBlirt(vb);
+                        }}
+                        disabled={busyId === vb.id || bulkDeleting}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                );
+              })()
+            ) : (
+              <>
+                <div className={styles.modalMeta}>
+                  <strong>{viewerBlirt.type}</strong>
+                  {(viewerBlirt.guest_name ?? '').trim()
+                    ? ` · From: ${(viewerBlirt.guest_name ?? '').trim()}`
+                    : ' · From: a friend'}
+                  <br />
+                  · {viewerBlirt.status ?? '—'} ·{' '}
+                  {viewerBlirt.created_at
+                    ? new Date(viewerBlirt.created_at).toLocaleString()
+                    : ''}
+                </div>
+                {(viewerBlirt.prompt_snapshot ?? '').trim() ? (
+                  <p className={styles.modalPrompt}>
+                    <span className={styles.blirtPromptLabel}>Prompt</span>{' '}
+                    {(viewerBlirt.prompt_snapshot ?? '').trim()}
+                  </p>
+                ) : null}
+                {(() => {
+                  const vt = (viewerBlirt.type || '').toLowerCase();
+                  if (vt === 'text') {
+                    return (
+                      <div className={styles.modalBodyText} style={{ whiteSpace: 'pre-wrap' }}>
+                        {viewerBlirt.content}
+                      </div>
+                    );
+                  }
+                  if (viewerMediaError) {
+                    return (
+                      <p className={styles.mediaErrorHint}>
+                        {friendlyBlirtStorageError(viewerMediaError)}
+                      </p>
+                    );
+                  }
+                  if (vt === 'video' && viewerUrl) {
+                    return <VideoFit src={viewerUrl} variant="modal" />;
+                  }
+                  if (vt === 'audio' && viewerUrl) {
+                    return <audio src={viewerUrl} controls autoPlay className={styles.modalAudio} />;
+                  }
+                  return <p className={styles.muted}>Loading media…</p>;
+                })()}
+                {(() => {
+                  const vt = (viewerBlirt.type || '').toLowerCase();
+                  const nonText = vt !== 'text';
+                  if (!viewerUrl || !nonText || viewerMediaError) return null;
+                  return (
+                    <a
+                      className={styles.link}
+                      href={viewerUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ display: 'inline-block', marginTop: 12 }}
+                    >
+                      Open / download file
+                    </a>
+                  );
+                })()}
+                <div className={styles.modalFooter}>
+                  <button
+                    type="button"
+                    className={`${styles.button} ${styles.buttonDanger}`}
+                    onClick={() => {
+                      deleteBlirt(viewerBlirt);
+                    }}
+                    disabled={busyId === viewerBlirt.id || bulkDeleting}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

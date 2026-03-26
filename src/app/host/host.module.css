@@ -419,7 +419,121 @@
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
+}
+
+/* Soundtrack Blirt modal (envelope inbox viewer) */
+.modalSoundtrackSongCard {
+  margin: 0 0 0;
+  padding-right: 32px;
+}
+
+.modalSoundtrackSongRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.modalSoundtrackArtWrap {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+}
+
+.modalSoundtrackArt {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+  background: rgba(26, 26, 26, 0.06);
+}
+
+.modalSoundtrackArtFallback {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(26, 26, 26, 0.12), rgba(26, 26, 26, 0.06));
+}
+
+.modalSoundtrackSongText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.modalSoundtrackTrackName {
+  font-size: 16px;
+  font-weight: 800;
+  color: #1a1a1a;
+  line-height: 1.25;
+  margin-bottom: 2px;
+}
+
+.modalSoundtrackArtistName {
+  font-size: 14px;
+  color: rgba(26, 26, 26, 0.58);
+  line-height: 1.35;
+}
+
+.modalSoundtrackAlbumName {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(26, 26, 26, 0.42);
+}
+
+.modalSoundtrackDedicated {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: rgba(26, 26, 26, 0.48);
+  line-height: 1.35;
+}
+
+.modalSoundtrackPreviewRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.modalSoundtrackPreviewBtn {
+  flex-shrink: 0;
+}
+
+.modalSoundtrackSpotifyInline {
+  font-size: 13px;
+  font-weight: 750;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.modalSoundtrackDivider {
+  height: 0;
+  margin: 16px 0;
+  padding-right: 32px;
+  border: none;
+  border-top: 1px solid rgba(26, 26, 26, 0.12);
+}
+
+.modalSoundtrackLinkStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding-right: 32px;
+}
+
+.modalSoundtrackLinkLine {
+  display: block;
+  font-size: 14px;
+  font-weight: 650;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .blirtMeta {
