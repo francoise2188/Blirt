@@ -6,6 +6,7 @@ import styles from './page.module.css';
 const PRICING_FEATURES = [
   'Unlimited guest Blirts',
   'Video, voice, and text messages',
+  'Spotify song dedications',
   'Private host dashboard',
   'Swipe or envelope inbox view',
   'Keepsake PDF collection',
@@ -172,8 +173,10 @@ export default function HomePage() {
               Pricing
             </h2>
             <div className={styles.pricingAmount}>
-              <span className={styles.priceValue}>$29</span>
-              <span className={styles.priceUnit}>per event</span>
+              <p className={styles.pricingLaunchCopy}>
+                <strong>Launching soon.</strong> Early events get free access while we grow — sign up to be
+                first in line.
+              </p>
             </div>
             <ul className={styles.pricingFeatures}>
               {PRICING_FEATURES.map((line) => (
@@ -185,13 +188,9 @@ export default function HomePage() {
                 </li>
               ))}
             </ul>
-            <p className={styles.launchBadge}>
-              🎉 Launch pricing — price increases as we grow
-            </p>
             <Link href="/login" className={styles.pricingCta}>
-              Create your event — $29
+              Create your event
             </Link>
-            <p className={styles.pricingFootnote}>One time. No subscription. No surprises.</p>
           </div>
         </div>
       </section>
@@ -199,7 +198,26 @@ export default function HomePage() {
       <footer className={styles.landingFooter}>
         <p className={styles.footerWordmark}>Blirt</p>
         <p className={styles.footerDomain}>blirt-it.com</p>
-        <p className={styles.footerSocial}>@blirtit on Instagram &amp; TikTok</p>
+        <p className={styles.footerSocial}>
+          <a
+            href="https://www.instagram.com/blirt_it/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.footerSocialLink}
+          >
+            @blirt_it
+          </a>
+          {' on Instagram & '}
+          <a
+            href="https://www.tiktok.com/@blirtit?is_from_webapp=1&sender_device=pc"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.footerSocialLink}
+          >
+            @blirtit
+          </a>
+          {' on TikTok'}
+        </p>
         <p className={styles.footerMade}>Made with 💛 in Austin, TX</p>
       </footer>
     </div>

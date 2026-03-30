@@ -17,6 +17,7 @@ import {
   openQrPrintSheet,
   svgQrToPngDataUrl,
 } from '../../../../lib/qrExport';
+import { downloadPrintCard, downloadQRCodeAsPng } from '../../../../lib/blirtQrDownloads';
 import {
   buildBlirtsCollectionPdf,
   collectionPdfFilename,
@@ -600,22 +601,37 @@ export default function HostEventManagePage() {
     else setSelectedIds(blirts.map((b) => b.id));
   }
 
+  function qrDownloadSlug(): string {
+    return eventTitleForFiles
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40);
+  }
+
   async function downloadQrPng() {
-    const svg = qrWrapRef.current?.querySelector('svg');
-    if (!svg) {
-      window.alert('QR code is not ready yet.');
-      return;
-    }
     setQrBusy(true);
     try {
-      const png = await svgQrToPngDataUrl(svg, 1200);
-      const slug = eventTitleForFiles
-        .replace(/[^a-z0-9]+/gi, '-')
-        .replace(/^-|-$/g, '')
-        .slice(0, 40);
-      downloadPngDataUrl(png, `blirt-qr-${slug || eventId}.png`);
+      const slug = qrDownloadSlug();
+      await downloadQRCodeAsPng(guestUrl, {
+        width: 1200,
+        filename: `blirt-qr-${slug || eventId}.png`,
+      });
     } catch {
       window.alert('Could not build the image. Try another browser or update your browser.');
+    } finally {
+      setQrBusy(false);
+    }
+  }
+
+  async function downloadBlirtPrintCardPdf() {
+    setQrBusy(true);
+    try {
+      const slug = qrDownloadSlug();
+      await downloadPrintCard(guestUrl, eventTitleForFiles, {
+        filename: `blirt-print-card-${slug || eventId.slice(0, 8)}.pdf`,
+      });
+    } catch {
+      window.alert('Could not build the print card. Try another browser or update your browser.');
     } finally {
       setQrBusy(false);
     }
@@ -1639,6 +1655,14 @@ export default function HostEventManagePage() {
               <button
                 type="button"
                 className={`${styles.button} ${styles.buttonGhost}`}
+                onClick={() => void downloadBlirtPrintCardPdf()}
+                disabled={qrBusy}
+              >
+                {qrBusy ? 'Working…' : 'Download print card (PDF)'}
+              </button>
+              <button
+                type="button"
+                className={`${styles.button} ${styles.buttonGhost}`}
                 onClick={() => void printQrSheet()}
                 disabled={qrBusy}
               >
@@ -1646,8 +1670,8 @@ export default function HostEventManagePage() {
               </button>
             </div>
             <p className={styles.muted} style={{ margin: 0 }}>
-              Download a high-resolution image for signs, or print a sheet with the link and QR. One
-              code per event — it always opens this guest page.
+              Download a high-resolution PNG for signs, a ready-to-print 4×6&Prime; card (PDF), or print a
+              sheet with the link and QR. One code per event — it always opens this guest page.
             </p>
           </div>
         </div>

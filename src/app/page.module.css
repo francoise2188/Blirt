@@ -607,19 +607,20 @@
   margin-bottom: 28px;
 }
 
-.priceValue {
+.pricingLaunchCopy {
+  margin: 0;
+  max-width: 24rem;
   font-family: var(--font-blirt, 'Fraunces', Georgia, serif);
-  font-size: clamp(48px, 14vw, 64px);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  color: #1a1a1a;
+  font-size: clamp(17px, 4.2vw, 22px);
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  color: rgba(26, 26, 26, 0.88);
 }
 
-.priceUnit {
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(26, 26, 26, 0.48);
+.pricingLaunchCopy strong {
+  font-weight: 700;
+  color: #1a1a1a;
 }
 
 .pricingFeatures {
@@ -651,21 +652,6 @@
   font-weight: 800;
   color: #b5cc2e;
   line-height: 1.45;
-}
-
-.launchBadge {
-  margin: 0 0 22px;
-  padding: 12px 16px;
-  border-radius: 999px;
-  display: inline-block;
-  max-width: 100%;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: #1a1a1a;
-  background: rgba(181, 204, 46, 0.38);
-  border: 1px solid rgba(181, 204, 46, 0.55);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
 }
 
 .pricingCta {
@@ -707,14 +693,6 @@
     transform: translateY(3px);
     box-shadow: 0 5px 0 rgba(0, 0, 0, 0.06);
   }
-}
-
-.pricingFootnote {
-  margin: 16px 0 0;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.5;
-  color: rgba(26, 26, 26, 0.48);
 }
 
 @media (min-width: 640px) {
@@ -765,6 +743,17 @@
   font-size: 13px;
   font-weight: 500;
   color: rgba(26, 26, 26, 0.45);
+}
+
+.footerSocialLink {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.footerSocialLink:hover {
+  color: #1a1a1a;
 }
 
 .footerMade {
