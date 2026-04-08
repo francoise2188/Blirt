@@ -197,6 +197,17 @@ export default function HomePage() {
 
       <footer className={styles.landingFooter}>
         <p className={styles.footerWordmark}>Blirt</p>
+        <p className={styles.footerNav}>
+          <Link href="/about" className={styles.footerNavLink}>
+            About
+          </Link>
+          <span className={styles.footerNavSep} aria-hidden>
+            ·
+          </span>
+          <Link href="/blog" className={styles.footerNavLink}>
+            Blog
+          </Link>
+        </p>
         <p className={styles.footerDomain}>blirt-it.com</p>
         <p className={styles.footerSocial}>
           <a

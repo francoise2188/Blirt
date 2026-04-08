@@ -731,6 +731,28 @@
   color: #1a1a1a;
 }
 
+.footerNav {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.footerNavLink {
+  color: rgba(26, 26, 26, 0.55);
+  text-decoration: none;
+}
+
+.footerNavLink:hover {
+  color: #1a1a1a;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.footerNavSep {
+  margin: 0 8px;
+  color: rgba(26, 26, 26, 0.35);
+}
+
 .footerDomain {
   margin: 0 0 8px;
   font-size: 13px;

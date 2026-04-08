@@ -24,9 +24,16 @@ export default function HostLoginPage() {
     });
   }, [router]);
 
+  /**
+   * Where Supabase sends users after they click “Confirm” in the email.
+   * Must match an entry in Supabase → Authentication → URL Configuration → Redirect URLs
+   * (e.g. https://blirt-it.com/auth/callback and http://localhost:3001/auth/callback for dev).
+   */
   function getEmailRedirectTo() {
     if (typeof window === 'undefined') return undefined;
-    return `${window.location.origin}/login`;
+    const envBase = (process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/$/, '');
+    const origin = envBase || window.location.origin;
+    return `${origin}/auth/callback`;
   }
 
   async function onLoginSubmit(e: FormEvent) {
