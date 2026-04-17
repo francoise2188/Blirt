@@ -5,6 +5,8 @@ import confetti from 'canvas-confetti';
 import { animate, motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
 import styles from '../app/host/host.module.css';
 import { friendlyBlirtStorageError } from '../lib/blirtsStoragePath';
+import HostSoundtrackInboxPlayback from './HostSoundtrackInboxPlayback';
+import { getProxiedDeezerPreviewUrl, SONG_DEDICATION_PLACEHOLDER_ART } from '../lib/songDedication';
 
 /** Matches host event Blirt row shape so callbacks stay type-safe with Supabase helpers. */
 export type SwipeBlirt = {
@@ -294,213 +296,37 @@ function SwipeSoundtrackCard({
   onActionsReady: (ready: boolean) => void;
   onSkip: () => void;
 }) {
-  const previewAudioObjRef = useRef<HTMLAudioElement | null>(null);
-  const memoryAudioRef = useRef<HTMLAudioElement | null>(null);
-  const memoryVideoRef = useRef<HTMLVideoElement | null>(null);
-  const [muted, setMuted] = useState(false);
-  const [showMemory, setShowMemory] = useState(false);
-  const [showText, setShowText] = useState(false);
-  const [previewNeedsTap, setPreviewNeedsTap] = useState(false);
-  const [previewPlaying, setPreviewPlaying] = useState(false);
-  const [previewProgress, setPreviewProgress] = useState(0);
-  const [memoryNeedsTapUnmute, setMemoryNeedsTapUnmute] = useState(false);
+  const [deezerPreviewUrl, setDeezerPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(true);
 
-  const trackName = (blirt.spotify_track_name ?? '').trim();
-  const artistName = (blirt.spotify_artist_name ?? '').trim();
-  const albumName = (blirt.spotify_album_name ?? '').trim();
-  const artUrl = (blirt.spotify_album_art_url ?? '').trim() || null;
-  const rawPreview = blirt.spotify_preview_url;
-  const rawPreviewStr = typeof rawPreview === 'string' ? rawPreview : rawPreview == null ? null : String(rawPreview);
-  const previewUrl = (rawPreviewStr ?? '').trim() || null;
+  const trackName = (blirt.spotify_track_name ?? '').trim() || 'Song';
+  const artistName = (blirt.spotify_artist_name ?? '').trim() || 'Artist';
+  const artUrl = (blirt.spotify_album_art_url ?? '').trim();
   const guestName = (blirt.guest_name ?? '').trim() || 'a friend';
   const memType = ((blirt.soundtrack_message_type ?? 'text') || 'text').toLowerCase();
   const spotifyTrackId = (blirt.spotify_track_id ?? '').trim();
-  const openSpotifyUrl = spotifyTrackId ? `https://open.spotify.com/track/${spotifyTrackId}` : null;
-
-  const previewStatus = useMemo(() => {
-    if (rawPreview == null) return 'null';
-    if (typeof rawPreviewStr === 'string' && rawPreviewStr.trim() === '') return 'empty';
-    if (previewUrl && /^https?:\/\//i.test(previewUrl)) return 'valid_url';
-    if (previewUrl) return 'non_http_value';
-    return 'unknown';
-  }, [previewUrl, rawPreview, rawPreviewStr]);
+  const openSpotifyUrl = spotifyTrackId
+    ? `https://open.spotify.com/track/${spotifyTrackId}`
+    : `https://open.spotify.com/search/${encodeURIComponent(`${trackName} ${artistName}`)}`;
 
   useEffect(() => {
-    console.log('[Soundtrack swipe] active blirt =', blirt);
-    console.log('[Soundtrack swipe] spotify_preview_url raw =', rawPreview);
-    console.log('[Soundtrack swipe] spotify_preview_url normalized =', previewUrl);
-    console.log('[Soundtrack swipe] spotify_preview_url status =', previewStatus);
-    onActionsReady(false);
-    setShowMemory(false);
-    setShowText(false);
-    setMuted(false);
-    setPreviewNeedsTap(false);
-    setPreviewPlaying(false);
-    setPreviewProgress(0);
-
-    const previewObj = previewAudioObjRef.current;
-    if (previewObj) {
-      previewObj.pause();
-      previewObj.src = '';
-      previewAudioObjRef.current = null;
-    }
-    const ma = memoryAudioRef.current;
-    if (ma) {
-      ma.pause();
-      ma.currentTime = 0;
-    }
-    const mv = memoryVideoRef.current;
-    if (mv) {
-      mv.pause();
-      mv.currentTime = 0;
-    }
-
     let cancelled = false;
-    const start = async () => {
-      setMemoryNeedsTapUnmute(false);
-      if (!previewUrl) {
-        // No Spotify preview available — jump straight to the memory.
-        setShowMemory(true);
-      } else {
-        const a = new Audio(previewUrl);
-        previewAudioObjRef.current = a;
-        a.preload = 'auto';
-        a.loop = true;
-        a.volume = muted ? 0 : 0.35;
-        a.muted = muted;
-        try {
-          await a.play();
-          if (!cancelled) {
-            setPreviewPlaying(true);
-            setPreviewNeedsTap(false);
-          }
-        } catch {
-          if (!cancelled) {
-            setPreviewNeedsTap(true);
-            setPreviewPlaying(false);
-          }
-        }
-        await new Promise((r) => setTimeout(r, 3000));
-
-        if (cancelled) return;
-        setShowMemory(true);
+    setPreviewLoading(true);
+    setDeezerPreviewUrl(null);
+    void getProxiedDeezerPreviewUrl(trackName, artistName).then((url) => {
+      if (!cancelled) {
+        setDeezerPreviewUrl(url);
+        setPreviewLoading(false);
       }
-
-      if (cancelled) return;
-
-      // Duck the soundtrack preview under the memory.
-      if (previewAudioObjRef.current) {
-        previewAudioObjRef.current.volume = muted ? 0 : 0.15;
-        previewAudioObjRef.current.muted = muted;
-      }
-
-      if (memType === 'text') {
-        setShowText(true);
-        window.setTimeout(() => {
-          if (!cancelled) onActionsReady(true);
-        }, 1800);
-        return;
-      }
-    };
-
-    void start();
+    });
     return () => {
       cancelled = true;
-      onActionsReady(true);
-      const p = previewAudioObjRef.current;
-      if (p) {
-        p.pause();
-        p.src = '';
-        previewAudioObjRef.current = null;
-      }
-      const a = memoryAudioRef.current;
-      if (a) a.pause();
-      const v = memoryVideoRef.current;
-      if (v) v.pause();
     };
-  }, [blirt.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Drive the custom preview progress bar.
-  useEffect(() => {
-    if (!previewPlaying) {
-      setPreviewProgress(0);
-      return;
-    }
-    let raf = 0;
-    const tick = () => {
-      const a = previewAudioObjRef.current;
-      if (a && Number.isFinite(a.duration) && a.duration > 0) {
-        setPreviewProgress(Math.max(0, Math.min(1, a.currentTime / a.duration)));
-      }
-      raf = window.requestAnimationFrame(tick);
-    };
-    raf = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(raf);
-  }, [previewPlaying, blirt.id]);
+  }, [blirt.id, trackName, artistName]);
 
   useEffect(() => {
-    const p = previewAudioObjRef.current;
-    if (p) {
-      p.muted = muted;
-      p.volume = muted ? 0 : (showMemory ? 0.15 : 0.35);
-    }
-    const a = memoryAudioRef.current;
-    if (a) {
-      a.muted = muted;
-      a.volume = muted ? 0 : 1;
-    }
-    const v = memoryVideoRef.current;
-    if (v) {
-      v.muted = muted;
-      v.volume = muted ? 0 : 1;
-    }
-  }, [muted, showMemory]);
-
-  // Start the memory playback only AFTER the memory UI has mounted.
-  useEffect(() => {
-    if (!showMemory) return;
-    if (!mediaUrl) return;
-
-    if (memType === 'audio') {
-      const el = memoryAudioRef.current;
-      if (!el) return;
-      setMemoryNeedsTapUnmute(false);
-      el.volume = 1.0;
-      el.muted = false;
-      const onEnded = () => onActionsReady(true);
-      el.addEventListener('ended', onEnded, { once: true });
-      void el.play().catch(() => {
-        setMemoryNeedsTapUnmute(true);
-      });
-      return () => {
-        el.removeEventListener('ended', onEnded);
-      };
-    }
-
-    if (memType === 'video') {
-      const v = memoryVideoRef.current;
-      if (!v) return;
-      setMemoryNeedsTapUnmute(false);
-      v.volume = 1.0;
-      v.muted = false;
-      const onEnded = () => onActionsReady(true);
-      v.addEventListener('ended', onEnded, { once: true });
-      void v.play().catch(async () => {
-        try {
-          v.muted = true;
-          await v.play();
-          setMemoryNeedsTapUnmute(true);
-        } catch {
-          setMemoryNeedsTapUnmute(true);
-        }
-      });
-      return () => {
-        v.removeEventListener('ended', onEnded);
-      };
-    }
-
-    return;
-  }, [showMemory, memType, mediaUrl, blirt.id, onActionsReady]);
+    onActionsReady(false);
+  }, [blirt.id, onActionsReady]);
 
   return (
     <div className={styles.swipeSoundtrackCard}>
@@ -536,152 +362,64 @@ function SwipeSoundtrackCard({
           >
             ×
           </button>
-          {previewUrl ? (
-            <button
-              type="button"
-              className={styles.swipeSoundtrackMute}
-              onClick={(e) => {
-                e.stopPropagation();
-                setMuted((m) => !m);
-              }}
-            >
-              {muted ? 'Unmute' : 'Mute'}
-            </button>
-          ) : null}
         </div>
       </div>
 
       <div className={styles.swipeSoundtrackInner}>
-        <div className={styles.swipeSoundtrackArtWrap}>
-          {artUrl ? (
-            <img src={artUrl} alt="" className={styles.swipeSoundtrackArt} />
-          ) : (
-            <div className={styles.swipeSoundtrackArtFallback} aria-hidden />
-          )}
-        </div>
-
-        <div className={styles.swipeSoundtrackTrack}>{trackName || 'Song dedication'}</div>
-        <div className={styles.swipeSoundtrackArtist}>{artistName || ' '}</div>
-        <div className={styles.swipeSoundtrackAlbum}>{albumName || ' '}</div>
+        <p className={styles.swipeOverlayPrompt}>{SOUNDTRACK_PROMPT}</p>
         <div className={styles.swipeSoundtrackDedicatedBy}>
           Dedicated by <span>{guestName}</span>
         </div>
 
-        {previewUrl ? (
-          <div className={styles.swipeSoundtrackPreviewControls}>
-            <button
-              type="button"
-              className={styles.swipeSoundtrackPreviewPlay}
-              aria-label={previewPlaying ? 'Pause song preview' : 'Play song preview'}
-              onClick={async (e) => {
-                e.stopPropagation();
-                const a = previewAudioObjRef.current;
-                if (!a) return;
-                if (previewPlaying) {
-                  a.pause();
-                  setPreviewPlaying(false);
-                  return;
-                }
-                try {
-                  await a.play();
-                  setPreviewPlaying(true);
-                  setPreviewNeedsTap(false);
-                } catch {
-                  setPreviewNeedsTap(true);
-                }
-              }}
-            >
-              <span
-                className={
-                  previewPlaying ? styles.swipeSoundtrackPreviewPauseBars : styles.swipeSoundtrackPreviewPlayTri
-                }
-                aria-hidden
-              />
-            </button>
-            <div className={styles.swipeSoundtrackProgressTrack} aria-hidden>
-              <div
-                className={styles.swipeSoundtrackProgressFill}
-                style={{ width: `${Math.round(previewProgress * 100)}%` }}
-              />
-            </div>
-            {previewNeedsTap ? (
-              <div className={styles.swipeSoundtrackNoPreview} role="status">
-                Tap play to start audio (mobile)
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {showMemory ? (
-          <div className={styles.swipeSoundtrackMemory}>
-            <p className={styles.swipeOverlayPrompt}>{SOUNDTRACK_PROMPT}</p>
-            {mediaErr ? (
-              <div className={styles.swipeSoundtrackMemoryErr}>{friendlyBlirtStorageError(mediaErr)}</div>
-            ) : memType === 'text' ? (
-              <div className={`${styles.swipeSoundtrackText} ${showText ? styles.swipeSoundtrackTextShow : ''}`}>
-                {blirt.content}
-              </div>
-            ) : memType === 'audio' ? (
-              mediaUrl ? (
-                <>
-                  <div className={styles.swipeSoundtrackWave} aria-hidden />
-                  <audio ref={memoryAudioRef} src={mediaUrl} preload="auto" className={styles.swipeHiddenMedia} />
-                </>
-              ) : (
-                <div className={styles.swipeSoundtrackMemoryErr}>Loading…</div>
-              )
-            ) : mediaUrl ? (
-              <video
-                ref={memoryVideoRef}
-                className={styles.swipeSoundtrackVideo}
-                src={mediaUrl}
-                autoPlay
-                playsInline
-                preload="auto"
-              />
-            ) : (
-              <div className={styles.swipeSoundtrackMemoryErr}>Loading…</div>
-            )}
-          </div>
-        ) : null}
-
-        {memoryNeedsTapUnmute ? (
-          <button
-            type="button"
-            className={styles.swipeTapUnmutePill}
-            onClick={(e) => {
-              e.stopPropagation();
-              const v = memoryVideoRef.current;
-              if (v) {
-                v.muted = false;
-                v.volume = 1.0;
-                void v.play().catch(() => {});
-              }
-              const a = memoryAudioRef.current;
-              if (a) {
-                a.muted = false;
-                a.volume = 1.0;
-                void a.play().catch(() => {});
-              }
-              setMemoryNeedsTapUnmute(false);
-            }}
-          >
-            Tap to unmute 🔊
-          </button>
-        ) : null}
-
-        {openSpotifyUrl ? (
-          <a
-            className={styles.swipeSoundtrackSpotifyBtn}
-            href={openSpotifyUrl}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span className={styles.swipeSoundtrackSpotifyIcon} aria-hidden />
-            Open in Spotify
-          </a>
-        ) : null}
+        <div className={styles.swipeSoundtrackPlaybackRegion}>
+          {mediaErr ? (
+            <div className={styles.swipeSoundtrackMemoryErr}>{friendlyBlirtStorageError(mediaErr)}</div>
+          ) : memType === 'text' ? (
+            <HostSoundtrackInboxPlayback
+              key={blirt.id}
+              mode="text"
+              textContent={blirt.content}
+              previewUrl={deezerPreviewUrl}
+              previewLoading={previewLoading}
+              albumArtUrl={artUrl || SONG_DEDICATION_PLACEHOLDER_ART}
+              title={trackName}
+              artist={artistName}
+              spotifyUrl={openSpotifyUrl}
+              variant="swipe"
+              onSwipeReady={() => onActionsReady(true)}
+            />
+          ) : memType === 'video' && mediaUrl ? (
+            <HostSoundtrackInboxPlayback
+              key={blirt.id}
+              mode="video"
+              videoSrc={mediaUrl}
+              previewUrl={deezerPreviewUrl}
+              previewLoading={previewLoading}
+              albumArtUrl={artUrl || SONG_DEDICATION_PLACEHOLDER_ART}
+              title={trackName}
+              artist={artistName}
+              spotifyUrl={openSpotifyUrl}
+              variant="swipe"
+              onSwipeReady={() => onActionsReady(true)}
+            />
+          ) : memType === 'audio' && mediaUrl ? (
+            <HostSoundtrackInboxPlayback
+              key={blirt.id}
+              mode="audio"
+              guestAudioSrc={mediaUrl}
+              previewUrl={deezerPreviewUrl}
+              previewLoading={previewLoading}
+              albumArtUrl={artUrl || SONG_DEDICATION_PLACEHOLDER_ART}
+              title={trackName}
+              artist={artistName}
+              spotifyUrl={openSpotifyUrl}
+              variant="swipe"
+              onSwipeReady={() => onActionsReady(true)}
+            />
+          ) : (
+            <div className={styles.swipeSoundtrackMemoryErr}>Loading…</div>
+          )}
+        </div>
       </div>
     </div>
   );

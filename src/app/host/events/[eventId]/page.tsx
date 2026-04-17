@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import QRCode from 'react-qr-code';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../../../../lib/supabaseClient';
+import { getExperiencePageUrl } from '../../../../lib/experienceUrl';
 import { getGuestPageUrl } from '../../../../lib/guestUrl';
 import {
   defaultGuestSlug,
@@ -18,16 +19,18 @@ import {
   svgQrToPngDataUrl,
 } from '../../../../lib/qrExport';
 import { downloadPrintCard, downloadQRCodeAsPng } from '../../../../lib/blirtQrDownloads';
-import {
-  buildBlirtsCollectionPdf,
-  collectionPdfFilename,
-} from '../../../../lib/exportBlirtsCollectionPdf';
+import { collectionPdfFilename } from '../../../../lib/exportBlirtsCollectionPdf';
 import { buildBlirtsZip } from '../../../../lib/exportBlirtsZip';
 import {
   friendlyBlirtStorageError,
   normalizeBlirtMediaStoragePath,
 } from '../../../../lib/blirtsStoragePath';
 import { VideoFit } from '../../../../components/VideoFit';
+import HostSoundtrackInboxPlayback from '../../../../components/HostSoundtrackInboxPlayback';
+import {
+  getProxiedDeezerPreviewUrl,
+  SONG_DEDICATION_PLACEHOLDER_ART,
+} from '../../../../lib/songDedication';
 import { HostBlirtSwipeDeck } from '../../../../components/HostBlirtSwipeDeck';
 import {
   HostSoundtrackTab,
@@ -185,12 +188,13 @@ export default function HostEventManagePage() {
   const [mediaUrlErrors, setMediaUrlErrors] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  /** Inbox: export/delete/help hidden until "Manage collection" is opened. */
+  /** Inbox: export/delete/help hidden until "Download collection" is opened. */
   const [collectionToolsOpen, setCollectionToolsOpen] = useState(false);
   const [inboxView, setInboxView] = useState<'envelopes' | 'swipe'>('envelopes');
   const [viewerBlirt, setViewerBlirt] = useState<BlirtRow | null>(null);
-  const [viewerSoundtrackPreviewPlaying, setViewerSoundtrackPreviewPlaying] = useState(false);
-  const viewerSoundtrackPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
+  /** Deezer proxy URL for inbox intro (same as guest search). */
+  const [hostInboxDeezerPreviewUrl, setHostInboxDeezerPreviewUrl] = useState<string | null>(null);
+  const [hostInboxPreviewLoading, setHostInboxPreviewLoading] = useState(false);
   const [openEnvelopeIds, setOpenEnvelopeIds] = useState<Set<string>>(() => new Set());
   const [envelopeCollapsedIds, setEnvelopeCollapsedIds] = useState<Set<string>>(() => new Set());
   const [envelopePlayId, setEnvelopePlayId] = useState<string | null>(null);
@@ -208,6 +212,7 @@ export default function HostEventManagePage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [qrBusy, setQrBusy] = useState(false);
   const qrWrapRef = useRef<HTMLDivElement | null>(null);
+  const experienceQrWrapRef = useRef<HTMLDivElement | null>(null);
 
   const [slugDraft, setSlugDraft] = useState('');
   const [slugSaving, setSlugSaving] = useState(false);
@@ -217,6 +222,8 @@ export default function HostEventManagePage() {
     () => getGuestPageUrl(eventId, { guestSlug: event?.guest_slug ?? null }),
     [eventId, event?.guest_slug],
   );
+  /** Full URL for QR (keepsake web experience — kept soundtrack Blirts). */
+  const experienceUrl = useMemo(() => getExperiencePageUrl(eventId), [eventId]);
   const eventTitleForFiles = useMemo(
     () => displayEventNames(event?.partner_1 ?? null, event?.partner_2 ?? null),
     [event?.partner_1, event?.partner_2],
@@ -378,15 +385,31 @@ export default function HostEventManagePage() {
   }, []);
 
   useEffect(() => {
-    const a = viewerSoundtrackPreviewAudioRef.current;
-    if (!viewerBlirt || (viewerBlirt.type || '').toLowerCase() !== 'soundtrack') {
-      if (a) {
-        a.pause();
-        a.removeAttribute('src');
-        a.load();
-      }
-      setViewerSoundtrackPreviewPlaying(false);
+    const vb = viewerBlirt;
+    if (!vb || (vb.type || '').toLowerCase() !== 'soundtrack') {
+      setHostInboxDeezerPreviewUrl(null);
+      setHostInboxPreviewLoading(false);
+      return;
     }
+    const name = (vb.spotify_track_name ?? '').trim();
+    const artist = (vb.spotify_artist_name ?? '').trim();
+    if (!name || !artist) {
+      setHostInboxDeezerPreviewUrl(null);
+      setHostInboxPreviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setHostInboxPreviewLoading(true);
+    setHostInboxDeezerPreviewUrl(null);
+    void getProxiedDeezerPreviewUrl(name, artist).then((url) => {
+      if (!cancelled) {
+        setHostInboxDeezerPreviewUrl(url);
+        setHostInboxPreviewLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [viewerBlirt]);
 
   useEffect(() => {
@@ -623,6 +646,21 @@ export default function HostEventManagePage() {
     }
   }
 
+  async function downloadExperienceQrPng() {
+    setQrBusy(true);
+    try {
+      const slug = qrDownloadSlug();
+      await downloadQRCodeAsPng(experienceUrl, {
+        width: 1200,
+        filename: `blirt-experience-qr-${slug || eventId.slice(0, 8)}.png`,
+      });
+    } catch {
+      window.alert('Could not build the image. Try another browser or update your browser.');
+    } finally {
+      setQrBusy(false);
+    }
+  }
+
   async function downloadBlirtPrintCardPdf() {
     setQrBusy(true);
     try {
@@ -650,6 +688,28 @@ export default function HostEventManagePage() {
         documentTitle: `Blirt QR — ${eventTitleForFiles}`,
         headline: eventTitleForFiles,
         guestUrl,
+        pngDataUrl: png,
+      });
+    } catch {
+      window.alert('Could not prepare print. Try Download QR instead.');
+    } finally {
+      setQrBusy(false);
+    }
+  }
+
+  async function printExperienceQrSheet() {
+    const svg = experienceQrWrapRef.current?.querySelector('svg');
+    if (!svg) {
+      window.alert('QR code is not ready yet.');
+      return;
+    }
+    setQrBusy(true);
+    try {
+      const png = await svgQrToPngDataUrl(svg, 1200);
+      openQrPrintSheet({
+        documentTitle: `Blirt experience — ${eventTitleForFiles}`,
+        headline: `${eventTitleForFiles} — relive messages & songs`,
+        guestUrl: experienceUrl,
         pngDataUrl: png,
       });
     } catch {
@@ -784,32 +844,32 @@ export default function HostEventManagePage() {
       return;
     }
     setPdfExporting(true);
-    // Let React paint “Building PDF…” before heavy work blocks the main thread.
     await new Promise((r) => setTimeout(r, 50));
     try {
-      const { blob, mediaLinkErrors } = await buildBlirtsCollectionPdf({
-        supabase,
-        items: blirts,
-        eventDisplayName: displayEventNames(event.partner_1, event.partner_2),
-        eventTypeLabel: event.event_type ?? null,
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        window.alert('Please sign in again to download your keepsake PDF.');
+        return;
+      }
+      const res = await fetch(`/api/keepsake-pdf?eventId=${encodeURIComponent(eventId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
+      if (!res.ok) {
+        const errBody = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(errBody.error || res.statusText || 'Could not build PDF.');
+      }
+      const blob = await res.blob();
       const name = collectionPdfFilename(displayEventNames(event.partner_1, event.partner_2));
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = name;
       a.rel = 'noopener';
-      // Detached anchor + click (same pattern as CSV/ZIP here) — avoids append/remove on body,
-      // which can race with React or extensions and throw removeChild errors.
       a.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      if (mediaLinkErrors.length) {
-        window.alert(
-          `PDF saved. Some media links could not be added (${mediaLinkErrors.length}). Use “Download all files” for the original video and audio files.`,
-        );
-      }
     } catch (e) {
-      console.error('Save my collection failed', e);
+      console.error('Keepsake PDF export failed', e);
       window.alert(
         e instanceof Error ? e.message : 'Could not build PDF. If this keeps happening, try a different browser.',
       );
@@ -996,7 +1056,7 @@ export default function HostEventManagePage() {
               id="host-collection-tools-toggle"
               onClick={() => setCollectionToolsOpen((o) => !o)}
             >
-              Manage collection {collectionToolsOpen ? '↑' : '↓'}
+              Download collection {collectionToolsOpen ? '▴' : '▾'}
             </button>
           </div>
           <div className={styles.inboxViewToggle} role="tablist" aria-label="Inbox layout">
@@ -1030,106 +1090,113 @@ export default function HostEventManagePage() {
               role="region"
               aria-labelledby="host-collection-tools-toggle"
             >
-              <p className={styles.muted} style={{ marginBottom: 12 }}>
-                Click a row to open and view. Use checkboxes for export or for delete, or delete everything in one step.
-              </p>
-              <p className={styles.muted} style={{ marginBottom: 12, fontSize: 13, lineHeight: 1.45 }}>
-                <strong>Save my collection</strong> — a readable PDF of written messages, plus links to open video and
-                voice notes (made for couples and keepsakes).{' '}
-                <strong>Export as spreadsheet</strong> — rows and columns for planners, vendors, or data work (includes
-                links to media, not the files themselves).{' '}
-                <strong>Download all files</strong> — the actual video, audio, and text files in a ZIP.
-              </p>
-              {Object.keys(mediaUrlErrors).length > 0 ? (
-                <p className={styles.rlsHelpBanner} role="status">
-                  Some media could not be opened. <strong>Object not found</strong> means there is no file in Storage for
-                  that row (upload failed before the fix) — you can delete those entries. Other errors are often
-                  permissions — run{' '}
-                  <code className={styles.inlineCode}>supabase/RLS_FIX_LOADING_AND_GUEST_UPLOAD.sql</code> in Supabase
-                  (full script, section F adds guest cleanup), then refresh.
+              <div className={styles.keepsakePanel}>
+                <p className={styles.keepsakeLead}>
+                  Save your Blirts as a keepsake: a beautiful PDF, your original files, or a spreadsheet. Use the
+                  checkboxes on each row to limit CSV and ZIP to specific messages — otherwise they include
+                  everything.
                 </p>
-              ) : null}
-              <div className={styles.exportRow}>
-                <button
-                  type="button"
-                  className={styles.button}
-                  onClick={() => void exportCollectionPdf()}
-                  disabled={pdfExporting || exporting || zipExporting || bulkDeleting}
-                  title={
-                    blirts.length === 0
-                      ? 'Nothing to export yet — you can still click for a message'
-                      : undefined
-                  }
-                >
-                  {pdfExporting ? 'Building PDF…' : 'Save my collection'}
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.button} ${styles.buttonGhost}`}
-                  onClick={() => exportCsvAll()}
-                  disabled={exporting || zipExporting || pdfExporting || bulkDeleting || blirts.length === 0}
-                >
-                  {exporting ? 'Exporting…' : 'Export all as spreadsheet'}
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.button} ${styles.buttonGhost}`}
-                  onClick={() => exportCsvSelected()}
-                  disabled={exporting || zipExporting || pdfExporting || bulkDeleting || selectedIds.length === 0}
-                >
-                  {exporting ? 'Exporting…' : `Export selected (${selectedIds.length}) as spreadsheet`}
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.button} ${styles.buttonGhost}`}
-                  onClick={() => exportZipAll()}
-                  disabled={zipExporting || exporting || pdfExporting || bulkDeleting || blirts.length === 0}
-                >
-                  {zipExporting ? 'Building ZIP…' : 'Download all files'}
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.button} ${styles.buttonGhost}`}
-                  onClick={() => exportZipSelected()}
-                  disabled={zipExporting || exporting || pdfExporting || bulkDeleting || selectedIds.length === 0}
-                >
-                  {zipExporting ? 'Building ZIP…' : `Download selected (${selectedIds.length}) files`}
-                </button>
+                {Object.keys(mediaUrlErrors).length > 0 ? (
+                  <p className={styles.muted} role="status" style={{ marginBottom: 14 }}>
+                    A few messages couldn&apos;t load their recording — usually the file never finished uploading. You can
+                    delete those rows if you don&apos;t need them. The Keepsake PDF does not include embedded video, voice,
+                    or song audio; to get those files, open the <strong>Soundtrack</strong> tab or download{' '}
+                    <strong>Original files</strong> (ZIP) in the buttons below.
+                  </p>
+                ) : null}
+                {blirts.length > 0 ? (
+                  <label className={styles.keepsakeSelectAll}>
+                    <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
+                    <span>Select all rows</span>
+                  </label>
+                ) : null}
+
+                <div className={styles.keepsakeGrid}>
+                  <button
+                    type="button"
+                    className={styles.keepsakeCard}
+                    onClick={() => void exportCollectionPdf()}
+                    disabled={pdfExporting || exporting || zipExporting || bulkDeleting || blirts.length === 0}
+                    title={blirts.length === 0 ? 'Add Blirts first' : undefined}
+                  >
+                    <span className={styles.keepsakeCardKicker}>Keepsake</span>
+                    <span className={styles.keepsakeCardTitle}>
+                      {pdfExporting ? 'Creating…' : 'Keepsake PDF'}
+                    </span>
+                    <span className={styles.keepsakeCardDesc}>
+                      Messages and media links in one readable document — perfect to save or print.
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.keepsakeCard}
+                    onClick={() =>
+                      void (selectedIds.length > 0 ? exportCsvSelected() : exportCsvAll())
+                    }
+                    disabled={exporting || zipExporting || pdfExporting || bulkDeleting || blirts.length === 0}
+                  >
+                    <span className={styles.keepsakeCardKicker}>Data</span>
+                    <span className={styles.keepsakeCardTitle}>
+                      {exporting ? 'Working…' : 'Spreadsheet'}
+                    </span>
+                    <span className={styles.keepsakeCardDesc}>
+                      {selectedIds.length > 0
+                        ? `CSV · ${selectedIds.length} selected row${selectedIds.length === 1 ? '' : 's'}`
+                        : 'CSV · entire collection (pick rows above to narrow)'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.keepsakeCard}
+                    onClick={() =>
+                      void (selectedIds.length > 0 ? exportZipSelected() : exportZipAll())
+                    }
+                    disabled={zipExporting || exporting || pdfExporting || bulkDeleting || blirts.length === 0}
+                  >
+                    <span className={styles.keepsakeCardKicker}>Files</span>
+                    <span className={styles.keepsakeCardTitle}>
+                      {zipExporting ? 'Zipping…' : 'Original files'}
+                    </span>
+                    <span className={styles.keepsakeCardDesc}>
+                      {selectedIds.length > 0
+                        ? `ZIP · ${selectedIds.length} selected row${selectedIds.length === 1 ? '' : 's'}`
+                        : 'ZIP · entire collection (pick rows above to narrow)'}
+                    </span>
+                  </button>
+                </div>
+
+                <div className={styles.keepsakeDanger}>
+                  <span className={styles.keepsakeDangerLabel}>Remove from inbox</span>
+                  <div className={styles.keepsakeDangerActions}>
+                    <button
+                      type="button"
+                      className={styles.keepsakeDangerBtn}
+                      onClick={() => {
+                        const items = blirts.filter((b) => selectedIds.includes(b.id));
+                        void deleteBlirtsBulk(items);
+                      }}
+                      disabled={
+                        bulkDeleting ||
+                        exporting ||
+                        zipExporting ||
+                        pdfExporting ||
+                        selectedIds.length === 0 ||
+                        blirts.length === 0
+                      }
+                    >
+                      {bulkDeleting ? 'Deleting…' : `Delete selected (${selectedIds.length})`}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.keepsakeDangerBtn}
+                      onClick={() => void deleteBlirtsBulk(blirts)}
+                      disabled={bulkDeleting || exporting || zipExporting || pdfExporting || blirts.length === 0}
+                    >
+                      {bulkDeleting ? 'Deleting…' : `Delete all (${blirts.length})`}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className={styles.exportRow}>
-                <button
-                  type="button"
-                  className={`${styles.button} ${styles.buttonDanger}`}
-                  onClick={() => {
-                    const items = blirts.filter((b) => selectedIds.includes(b.id));
-                    void deleteBlirtsBulk(items);
-                  }}
-                  disabled={
-                    bulkDeleting ||
-                    exporting ||
-                    zipExporting ||
-                    pdfExporting ||
-                    selectedIds.length === 0 ||
-                    blirts.length === 0
-                  }
-                >
-                  {bulkDeleting ? 'Deleting…' : `Delete selected (${selectedIds.length})`}
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.button} ${styles.buttonDanger}`}
-                  onClick={() => void deleteBlirtsBulk(blirts)}
-                  disabled={bulkDeleting || exporting || zipExporting || pdfExporting || blirts.length === 0}
-                >
-                  {bulkDeleting ? 'Deleting…' : `Delete all (${blirts.length})`}
-                </button>
-              </div>
-              {blirts.length > 0 && (
-                <label className={styles.selectAllRow}>
-                  <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
-                  <span>Select all</span>
-                </label>
-              )}
             </div>
           ) : null}
 
@@ -1311,116 +1378,67 @@ export default function HostEventManagePage() {
                 const artistName = (vb.spotify_artist_name ?? '').trim() || 'Artist';
                 const albumName = (vb.spotify_album_name ?? '').trim() || '—';
                 const guestLabel = (vb.guest_name ?? '').trim() || 'Guest';
-                const previewUrl = (vb.spotify_preview_url ?? '').trim();
                 const tid = (vb.spotify_track_id ?? '').trim();
-                const openSpotifyUrl = tid ? `https://open.spotify.com/track/${tid}` : null;
+                const openSpotifyUrl = tid
+                  ? `https://open.spotify.com/track/${tid}`
+                  : `https://open.spotify.com/search/${encodeURIComponent(`${trackName} ${artistName}`)}`;
                 const nonTextMem = soundtrackKind !== 'text';
                 const showFileLink = Boolean(viewerUrl && nonTextMem && !viewerMediaError);
 
                 return (
                   <>
-                    <audio
-                      ref={viewerSoundtrackPreviewAudioRef}
-                      preload="none"
-                      className={styles.soundtrackHiddenAudio}
-                      aria-hidden
-                      onEnded={() => setViewerSoundtrackPreviewPlaying(false)}
-                    />
-                    <div className={styles.modalSoundtrackSongCard}>
-                      <div className={styles.modalSoundtrackSongRow}>
-                        <div className={styles.modalSoundtrackArtWrap}>
-                          {artUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={artUrl}
-                              alt=""
-                              className={styles.modalSoundtrackArt}
-                              width={56}
-                              height={56}
-                            />
-                          ) : (
-                            <div className={styles.modalSoundtrackArtFallback} aria-hidden />
-                          )}
-                        </div>
-                        <div className={styles.modalSoundtrackSongText}>
-                          <div className={styles.modalSoundtrackTrackName}>{trackName}</div>
-                          <div className={styles.modalSoundtrackArtistName}>{artistName}</div>
-                          <div className={styles.modalSoundtrackAlbumName}>{albumName}</div>
-                        </div>
-                      </div>
-                      <p className={styles.modalSoundtrackDedicated}>
-                        Dedicated by {guestLabel}
-                      </p>
-                      <div className={styles.modalSoundtrackPreviewRow}>
-                        {previewUrl ? (
-                          <button
-                            type="button"
-                            className={`${styles.soundtrackRowPlay} ${styles.modalSoundtrackPreviewBtn}`}
-                            aria-label={
-                              viewerSoundtrackPreviewPlaying
-                                ? 'Pause preview'
-                                : 'Play 30 second preview'
-                            }
-                            onClick={async () => {
-                              if (!previewUrl) return;
-                              const a = viewerSoundtrackPreviewAudioRef.current;
-                              if (!a) return;
-                              if (viewerSoundtrackPreviewPlaying) {
-                                a.pause();
-                                setViewerSoundtrackPreviewPlaying(false);
-                                return;
-                              }
-                              a.src = previewUrl;
-                              try {
-                                await a.play();
-                                setViewerSoundtrackPreviewPlaying(true);
-                              } catch {
-                                setViewerSoundtrackPreviewPlaying(false);
-                              }
-                            }}
-                          >
-                            <span
-                              className={
-                                viewerSoundtrackPreviewPlaying
-                                  ? styles.soundtrackRowPlayPause
-                                  : styles.soundtrackRowPlayTri
-                              }
-                              aria-hidden
-                            />
-                          </button>
-                        ) : null}
-                        {openSpotifyUrl ? (
-                          <a
-                            className={styles.modalSoundtrackSpotifyInline}
-                            href={openSpotifyUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Open in Spotify →
-                          </a>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className={styles.modalSoundtrackDivider} aria-hidden />
+                    <p className={styles.modalSoundtrackDedicated}>
+                      Dedicated by {guestLabel}
+                      {albumName && albumName !== '—' ? (
+                        <span className={styles.modalSoundtrackAlbumMeta}> · {albumName}</span>
+                      ) : null}
+                    </p>
 
                     <p className={styles.modalPrompt}>
                       <span className={styles.blirtPromptLabel}>Prompt</span>{' '}
                       {SOUNDTRACK_PROMPT}
                     </p>
 
-                    {soundtrackKind === 'text' ? (
-                      <div className={styles.modalBodyText} style={{ whiteSpace: 'pre-wrap' }}>
-                        {vb.content}
-                      </div>
-                    ) : viewerMediaError ? (
+                    {viewerMediaError ? (
                       <p className={styles.mediaErrorHint}>
                         {friendlyBlirtStorageError(viewerMediaError)}
                       </p>
+                    ) : soundtrackKind === 'text' ? (
+                      <HostSoundtrackInboxPlayback
+                        key={vb.id}
+                        mode="text"
+                        textContent={vb.content}
+                        previewUrl={hostInboxDeezerPreviewUrl}
+                        previewLoading={hostInboxPreviewLoading}
+                        albumArtUrl={artUrl || SONG_DEDICATION_PLACEHOLDER_ART}
+                        title={trackName}
+                        artist={artistName}
+                        spotifyUrl={openSpotifyUrl}
+                      />
                     ) : soundtrackKind === 'video' && viewerUrl ? (
-                      <VideoFit src={viewerUrl} variant="modal" />
+                      <HostSoundtrackInboxPlayback
+                        key={vb.id}
+                        mode="video"
+                        videoSrc={viewerUrl}
+                        previewUrl={hostInboxDeezerPreviewUrl}
+                        previewLoading={hostInboxPreviewLoading}
+                        albumArtUrl={artUrl || SONG_DEDICATION_PLACEHOLDER_ART}
+                        title={trackName}
+                        artist={artistName}
+                        spotifyUrl={openSpotifyUrl}
+                      />
                     ) : soundtrackKind === 'audio' && viewerUrl ? (
-                      <audio src={viewerUrl} controls autoPlay className={styles.modalAudio} />
+                      <HostSoundtrackInboxPlayback
+                        key={vb.id}
+                        mode="audio"
+                        guestAudioSrc={viewerUrl}
+                        previewUrl={hostInboxDeezerPreviewUrl}
+                        previewLoading={hostInboxPreviewLoading}
+                        albumArtUrl={artUrl || SONG_DEDICATION_PLACEHOLDER_ART}
+                        title={trackName}
+                        artist={artistName}
+                        spotifyUrl={openSpotifyUrl}
+                      />
                     ) : (
                       <p className={styles.muted}>Loading media…</p>
                     )}
@@ -1674,6 +1692,80 @@ export default function HostEventManagePage() {
               sheet with the link and QR. One code per event — it always opens this guest page.
             </p>
           </div>
+
+          <div id="keepsake-experience" style={{ marginTop: 36, paddingTop: 28, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
+            <div className={styles.h2}>Keepsake experience (QR for after the event)</div>
+            <p className={styles.muted}>
+              This page is for <strong>you</strong> and your guests to relive saved soundtrack messages: song
+              previews, Spotify links, and kept video or voice notes. It only lists Blirts you marked{' '}
+              <strong>Keep</strong> in the inbox. Export videos stay music-free; this web page is where the
+              licensed preview audio plays.
+            </p>
+            <div className={styles.urlMono} style={{ marginTop: 12 }}>
+              {experienceUrl}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+              <button
+                type="button"
+                className={`${styles.button} ${styles.buttonGhost}`}
+                onClick={() => {
+                  void navigator.clipboard?.writeText(experienceUrl);
+                }}
+              >
+                Copy experience link
+              </button>
+              <a
+                className={`${styles.button} ${styles.buttonGhost}`}
+                href={experienceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+              >
+                Open experience
+              </a>
+            </div>
+            {keptSoundtrackBlirts.length === 0 ? (
+              <p className={styles.muted} style={{ marginTop: 12 }}>
+                No kept soundtrack Blirts yet — mark some as Keep in <strong>Envelopes</strong> to see them
+                here.
+              </p>
+            ) : (
+              <p className={styles.muted} style={{ marginTop: 12 }}>
+                {keptSoundtrackBlirts.length} kept soundtrack {keptSoundtrackBlirts.length === 1 ? 'message' : 'messages'} will appear on this page.
+              </p>
+            )}
+
+            <div className={styles.qrBox} style={{ marginTop: 20 }}>
+              <div className={styles.h2}>Experience QR code</div>
+              <div
+                ref={experienceQrWrapRef}
+                style={{ padding: 16, background: 'white', borderRadius: 12 }}
+              >
+                <QRCode value={experienceUrl} size={256} />
+              </div>
+              <div className={styles.qrActions}>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.buttonGhost}`}
+                  onClick={() => void downloadExperienceQrPng()}
+                  disabled={qrBusy}
+                >
+                  {qrBusy ? 'Working…' : 'Download experience QR (PNG)'}
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.buttonGhost}`}
+                  onClick={() => void printExperienceQrSheet()}
+                  disabled={qrBusy}
+                >
+                  {qrBusy ? 'Working…' : 'Print experience sheet'}
+                </button>
+              </div>
+              <p className={styles.muted} style={{ margin: 0 }}>
+                Put this on a closing slide, thank-you card, or email — different from the guest QR above.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1799,6 +1891,12 @@ export default function HostEventManagePage() {
           hasAnySoundtrackSubmission={hasAnySoundtrackBlirt}
           mediaUrls={mediaUrls}
           mediaUrlErrors={mediaUrlErrors}
+          onGoToExperienceShare={() => {
+            setTab('share');
+            window.setTimeout(() => {
+              document.getElementById('keepsake-experience')?.scrollIntoView({ behavior: 'smooth' });
+            }, 150);
+          }}
         />
       ) : null}
     </div>

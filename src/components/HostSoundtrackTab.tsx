@@ -27,6 +27,8 @@ type Props = {
   hasAnySoundtrackSubmission: boolean;
   mediaUrls: Record<string, string>;
   mediaUrlErrors: Record<string, string>;
+  /** Jump to Share tab → keepsake experience section */
+  onGoToExperienceShare?: () => void;
 };
 
 function guestLabel(name: string | null | undefined): string {
@@ -99,6 +101,7 @@ export function HostSoundtrackTab({
   hasAnySoundtrackSubmission,
   mediaUrls,
   mediaUrlErrors,
+  onGoToExperienceShare,
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [playingPreviewId, setPlayingPreviewId] = useState<string | null>(null);
@@ -195,6 +198,17 @@ export function HostSoundtrackTab({
       <p className={styles.soundtrackTabSub}>
         Songs your guests dedicated to you. Copy them all to build your playlist in Spotify.
       </p>
+
+      {keptSoundtracks.length > 0 && onGoToExperienceShare ? (
+        <div style={{ marginBottom: 18 }}>
+          <button type="button" className={styles.button} onClick={onGoToExperienceShare}>
+            Experience link &amp; QR
+          </button>
+          <span className={styles.muted} style={{ marginLeft: 10, fontWeight: 600 }}>
+            Relive kept messages with song previews (Share tab)
+          </span>
+        </div>
+      ) : null}
 
       <audio ref={previewAudioRef} preload="none" className={styles.soundtrackHiddenAudio} aria-hidden />
 

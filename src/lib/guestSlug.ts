@@ -8,6 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 const RESERVED = new Set([
   '',
   'api',
+  'e',
   'guest',
   'host',
   'login',

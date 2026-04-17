@@ -225,7 +225,15 @@ export async function buildBlirtsCollectionPdf(params: {
     for (let i = 0; i < media.length; i++) {
       const b = media[i];
       const t = (b.type || '').toLowerCase();
-      const label = t === 'video' ? 'Video' : 'Voice note';
+      const stKind = (b.soundtrack_message_type ?? '').toLowerCase();
+      const label =
+        t === 'soundtrack' && stKind === 'video'
+          ? 'Soundtrack · video message'
+          : t === 'soundtrack' && stKind === 'audio'
+            ? 'Soundtrack · voice note'
+            : t === 'video'
+              ? 'Video'
+              : 'Voice note';
       const guest = b.guest_name?.trim() || 'A friend';
       const when = formatLetterDate(b.created_at);
       const prompt = (b.type || '').toLowerCase() === 'soundtrack' ? SOUNDTRACK_PROMPT : (b.prompt_snapshot ?? '').trim();

@@ -228,6 +228,14 @@
   font-size: 14px;
 }
 
+.soundtrackBrowseHint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 650;
+  color: rgba(21, 21, 21, 0.62);
+}
+
 .soundtrackSearchInput {
   width: 100%;
   border-radius: 14px;
@@ -250,21 +258,77 @@
   gap: 10px;
 }
 
-.soundtrackResultCard {
+.soundtrackResultRow {
   width: 100%;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(21, 21, 21, 0.08);
+  background: rgba(255, 255, 255, 0.55);
+  overflow: hidden;
+  transition: transform 120ms ease;
+}
+
+.soundtrackResultRow:hover {
+  transform: translateY(-1px);
+}
+
+.soundtrackResultSelect {
+  flex: 1;
+  min-width: 0;
   text-align: left;
   display: flex;
   align-items: center;
   gap: 12px;
-  border-radius: 16px;
   padding: 10px 12px;
-  border: 1px solid rgba(21, 21, 21, 0.08);
-  background: rgba(255, 255, 255, 0.55);
+  border: none;
+  background: transparent;
   cursor: pointer;
+  font: inherit;
+  color: inherit;
 }
 
-.soundtrackResultCard:hover {
-  transform: translateY(-1px);
+.soundtrackPreviewBtn {
+  flex: 0 0 auto;
+  align-self: center;
+  margin: 0 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(21, 21, 21, 0.12);
+  background: rgba(250, 248, 244, 0.95);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.06);
+}
+
+.soundtrackPreviewBtn:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.soundtrackPreviewBtn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.soundtrackPreviewBtnActive {
+  border-color: rgba(181, 204, 46, 0.75);
+  background: rgba(181, 204, 46, 0.2);
+}
+
+.soundtrackBrowseAudio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .soundtrackThumb,
@@ -467,6 +531,14 @@
   text-align: left;
   border-radius: 10px;
   background: rgba(250, 248, 244, 0.55);
+}
+
+.previewStack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
 }
 
 .preview {
@@ -1052,5 +1124,15 @@
   line-height: 1.45;
   color: rgba(21, 21, 21, 0.65);
   max-width: 320px;
+}
+
+/* Main-thread confetti (see `confetti.create` in GuestRecordingPage) — must sit above all guest layers */
+.confettiCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2147483000;
 }
 

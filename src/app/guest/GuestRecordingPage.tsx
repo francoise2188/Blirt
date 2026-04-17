@@ -1,12 +1,21 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+} from 'react';
 import confetti from 'canvas-confetti';
 import styles from './page.module.css';
 import { supabase } from '../../lib/supabaseClient';
 import { submitGuestMediaBlirt, submitGuestSoundtrackMediaBlirt } from '../../lib/submitGuestBlirt';
 import { GUEST_MAX_PROMPT_SKIPS } from '../../lib/promptLibrary';
 import { VideoFit } from '../../components/VideoFit';
+import { getProxiedDeezerPreviewUrl } from '../../lib/songDedication';
 import {
   AUDIO_CONSTRAINTS,
   blobToAudioFile,
@@ -69,14 +78,23 @@ const CONFETTI_COLORS = [
   '#a3b92a',
 ];
 
-function fireSubmitConfetti() {
-  void confetti({
-    particleCount: 130,
-    spread: 70,
-    startVelocity: 32,
-    origin: { y: 0.72 },
-    colors: CONFETTI_COLORS,
-  });
+const SUBMIT_CONFETTI_OPTS = {
+  particleCount: 160,
+  spread: 78,
+  startVelocity: 36,
+  origin: { y: 0.66 },
+  colors: CONFETTI_COLORS,
+  ticks: 280,
+  disableForReducedMotion: false,
+};
+
+function fireBurst(api: ReturnType<typeof confetti.create> | null | undefined): void {
+  if (api) {
+    void api(SUBMIT_CONFETTI_OPTS);
+    return;
+  }
+  /** Fallback if custom canvas instance is not ready yet. */
+  void confetti({ ...SUBMIT_CONFETTI_OPTS, zIndex: 2147483000 });
 }
 
 function fillPrompt(template: string, partner1: string, partner2: string) {
@@ -131,6 +149,12 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
   const [spotifyError, setSpotifyError] = useState<string | null>(null);
   const [spotifyResults, setSpotifyResults] = useState<SpotifySearchResult[]>([]);
   const [selectedTrack, setSelectedTrack] = useState<SpotifySearchResult | null>(null);
+  const browsePreviewAudioRef = useRef<HTMLAudioElement | null>(null);
+  /** Step 1 search results: listen before choosing a song. */
+  const [browsePreview, setBrowsePreview] = useState<{
+    trackId: string | null;
+    phase: 'idle' | 'loading' | 'playing' | 'error';
+  }>({ trackId: null, phase: 'idle' });
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [message, setMessage] = useState('');
@@ -138,9 +162,39 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
   const [submitted, setSubmitted] = useState(false);
 
   const markSubmitted = useCallback(() => {
-    fireSubmitConfetti();
     setSubmitted(true);
   }, []);
+
+  /**
+   * Default `canvas-confetti` uses a Web Worker; that can fail silently on some mobile
+   * browsers. A fixed full-screen canvas + `create(..., { resize: true })` draws on the
+   * main thread and stays above all guest UI.
+   */
+  const confettiCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const confettiApiRef = useRef<ReturnType<typeof confetti.create> | null>(null);
+
+  useLayoutEffect(() => {
+    const canvas = confettiCanvasRef.current;
+    if (!canvas || typeof window === 'undefined') return;
+    const api = confetti.create(canvas, { resize: true });
+    confettiApiRef.current = api;
+    return () => {
+      try {
+        api.reset();
+      } catch {
+        /* ignore */
+      }
+      confettiApiRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!submitted) return;
+    const id = window.setTimeout(() => {
+      fireBurst(confettiApiRef.current);
+    }, 200);
+    return () => window.clearTimeout(id);
+  }, [submitted]);
 
   const audioInputRef = useRef<HTMLInputElement | null>(null);
   const messageRef = useRef<HTMLTextAreaElement | null>(null);
@@ -459,6 +513,68 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
       clearTimeout(t);
     };
   }, [mode, soundtrackStep, selectedTrack, spotifyQuery]);
+
+  useEffect(() => {
+    if (mode !== 'soundtrack' || selectedTrack) {
+      const a = browsePreviewAudioRef.current;
+      if (a) {
+        a.pause();
+        a.removeAttribute('src');
+        a.load();
+      }
+      setBrowsePreview({ trackId: null, phase: 'idle' });
+    }
+  }, [mode, selectedTrack]);
+
+  useEffect(() => {
+    const a = browsePreviewAudioRef.current;
+    if (a) {
+      a.pause();
+      a.removeAttribute('src');
+      a.load();
+    }
+    setBrowsePreview({ trackId: null, phase: 'idle' });
+  }, [spotifyResults]);
+
+  const handleBrowsePreviewClick = useCallback(async (r: SpotifySearchResult, e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const audio = browsePreviewAudioRef.current;
+    const playingThis = browsePreview.trackId === r.id && browsePreview.phase === 'playing';
+    if (playingThis && audio) {
+      audio.pause();
+      setBrowsePreview({ trackId: null, phase: 'idle' });
+      return;
+    }
+    if (browsePreview.trackId === r.id && browsePreview.phase === 'loading') return;
+
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+    }
+    setBrowsePreview({ trackId: r.id, phase: 'loading' });
+    try {
+      const url = await getProxiedDeezerPreviewUrl(r.name, r.artist_name);
+      const el = browsePreviewAudioRef.current;
+      if (!el) {
+        setBrowsePreview({ trackId: null, phase: 'idle' });
+        return;
+      }
+      if (!url) {
+        setBrowsePreview({ trackId: r.id, phase: 'error' });
+        window.setTimeout(() => setBrowsePreview({ trackId: null, phase: 'idle' }), 2200);
+        return;
+      }
+      el.src = url;
+      el.volume = 1;
+      await el.play();
+      setBrowsePreview({ trackId: r.id, phase: 'playing' });
+    } catch {
+      setBrowsePreview({ trackId: r.id, phase: 'error' });
+      window.setTimeout(() => setBrowsePreview({ trackId: null, phase: 'idle' }), 2200);
+    }
+  }, [browsePreview.phase, browsePreview.trackId]);
 
   useEffect(() => {
     return () => {
@@ -993,6 +1109,11 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
   };
 
   const handleReset = () => {
+    try {
+      confettiApiRef.current?.reset();
+    } catch {
+      /* ignore */
+    }
     cancelCountdown();
     const live = liveRecordingRef.current;
     if (live) {
@@ -1168,6 +1289,15 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
             <div className={styles.soundtrackHead}>
               <div className={styles.soundtrackTitle}>Step 1 — Pick a song</div>
             </div>
+            <p className={styles.soundtrackBrowseHint}>
+              Tap <strong>Preview</strong> to hear a short clip, then tap the song row to choose it.
+            </p>
+            <audio
+              ref={browsePreviewAudioRef}
+              className={styles.soundtrackBrowseAudio}
+              preload="none"
+              onEnded={() => setBrowsePreview({ trackId: null, phase: 'idle' })}
+            />
             <input
               className={styles.soundtrackSearchInput}
               value={spotifyQuery}
@@ -1188,34 +1318,57 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
             ) : null}
             <div className={styles.soundtrackResults} role="list" aria-label="Search results">
               {spotifyResults.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  className={styles.soundtrackResultCard}
-                  onClick={() => {
-                    console.log('[Soundtrack guest] selected track =', r);
-                    console.log('[Soundtrack guest] selected.preview_url =', r.preview_url);
+                <div key={r.id} className={styles.soundtrackResultRow} role="listitem">
+                  <button
+                    type="button"
+                    className={styles.soundtrackResultSelect}
+                    onClick={() => {
                     setSelectedTrack(r);
                     setSoundtrackStep(2);
                   }}
-                  role="listitem"
-                >
-                  {r.album_art_url ? (
-                    <img
-                      src={r.album_art_url}
-                      alt=""
-                      className={styles.soundtrackThumb}
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  ) : (
-                    <div className={styles.soundtrackThumbFallback} aria-hidden />
-                  )}
-                  <div className={styles.soundtrackResultText}>
-                    <div className={styles.soundtrackTrackName}>{r.name}</div>
-                    <div className={styles.soundtrackArtistName}>{r.artist_name}</div>
-                  </div>
-                </button>
+                  >
+                    {r.album_art_url ? (
+                      <img
+                        src={r.album_art_url}
+                        alt=""
+                        className={styles.soundtrackThumb}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className={styles.soundtrackThumbFallback} aria-hidden />
+                    )}
+                    <div className={styles.soundtrackResultText}>
+                      <div className={styles.soundtrackTrackName}>{r.name}</div>
+                      <div className={styles.soundtrackArtistName}>{r.artist_name}</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.soundtrackPreviewBtn} ${
+                      browsePreview.trackId === r.id && browsePreview.phase === 'playing'
+                        ? styles.soundtrackPreviewBtnActive
+                        : ''
+                    }`}
+                    disabled={
+                      browsePreview.trackId === r.id && browsePreview.phase === 'loading'
+                    }
+                    onClick={(ev) => void handleBrowsePreviewClick(r, ev)}
+                    aria-label={
+                      browsePreview.trackId === r.id && browsePreview.phase === 'playing'
+                        ? 'Stop preview'
+                        : 'Play a short preview before choosing this song'
+                    }
+                  >
+                    {browsePreview.trackId === r.id && browsePreview.phase === 'loading'
+                      ? '…'
+                      : browsePreview.trackId === r.id && browsePreview.phase === 'playing'
+                        ? 'Stop'
+                        : browsePreview.trackId === r.id && browsePreview.phase === 'error'
+                          ? 'No clip'
+                          : 'Preview'}
+                  </button>
+                </div>
               ))}
               {!spotifySearching && spotifyQuery.trim() && spotifyResults.length === 0 && !spotifyError ? (
                 <div className={styles.soundtrackMuted} role="status">
@@ -1605,6 +1758,8 @@ export default function GuestRecordingPage({ eventId }: { eventId: string }) {
           Blirt
         </div>
       </div>
+
+      <canvas ref={confettiCanvasRef} className={styles.confettiCanvas} aria-hidden />
     </div>
   );
 }

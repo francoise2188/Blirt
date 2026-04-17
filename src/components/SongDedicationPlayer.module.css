@@ -1,0 +1,88 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(21, 21, 21, 0.08);
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.art {
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.text {
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.artist {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted, rgba(21, 21, 21, 0.55));
+}
+
+.playbackHint {
+  margin: 0;
+  max-width: 28ch;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 650;
+  text-align: center;
+  color: rgba(21, 21, 21, 0.58);
+}
+
+.playButton {
+  border: none;
+  cursor: pointer;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  background: #111;
+  color: #fff;
+  font-family: var(--font-ui, system-ui, sans-serif);
+}
+
+.playButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.continueButton {
+  border: 1px solid rgba(21, 21, 21, 0.15);
+  cursor: pointer;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.6);
+  color: #111;
+  font-family: var(--font-ui, system-ui, sans-serif);
+}
+
+.spotifyLink {
+  font-size: 12px;
+  color: #15803d;
+  text-decoration: underline;
+  font-weight: 650;
+}
+
+.spotifyLink:hover {
+  text-decoration: none;
+}

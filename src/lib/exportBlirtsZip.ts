@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { normalizeBlirtMediaStoragePath } from './blirtsStoragePath';
 import { formatTextBlirtLetter } from './textBlirtLetterFormat';
 
+const SOUNDTRACK_PROMPT = 'This song reminds me of you because...';
+
 type BlirtRow = {
   id: string;
   type: string;
@@ -9,6 +11,7 @@ type BlirtRow = {
   created_at: string | null;
   guest_name: string | null;
   prompt_snapshot?: string | null;
+  soundtrack_message_type?: 'video' | 'audio' | 'text' | null;
 };
 
 /** Safe segment for filenames: "Frankie" → frankie, "Ann Marie" → ann-marie */
@@ -60,6 +63,18 @@ export async function buildBlirtsZip(params: {
 
   for (const b of params.items) {
     const t = (b.type || '').toLowerCase();
+    const soundtrackKind = (b.soundtrack_message_type ?? '').toLowerCase();
+    if (t === 'soundtrack' && soundtrackKind === 'text') {
+      const body = formatTextBlirtLetter({
+        eventDisplayName: params.eventDisplayName,
+        guestName: b.guest_name,
+        prompt: SOUNDTRACK_PROMPT,
+        message: b.content,
+        createdAt: b.created_at,
+      });
+      folder?.file(`soundtrack-text-${b.id.slice(0, 8)}.txt`, body);
+      continue;
+    }
     if (t === 'text') {
       const body = formatTextBlirtLetter({
         eventDisplayName: params.eventDisplayName,
@@ -74,7 +89,10 @@ export async function buildBlirtsZip(params: {
     }
 
     const mediaPath = normalizeBlirtMediaStoragePath(b.content);
-    if ((t === 'video' || t === 'audio') && mediaPath.includes('/')) {
+    const isSoundtrackMedia =
+      t === 'soundtrack' && (soundtrackKind === 'video' || soundtrackKind === 'audio');
+    const isPlainMedia = t === 'video' || t === 'audio';
+    if ((isPlainMedia || isSoundtrackMedia) && mediaPath.includes('/')) {
       const { data, error } = await params.supabase.storage
         .from('blirts-media')
         .createSignedUrl(mediaPath, 7200);
@@ -93,18 +111,28 @@ export async function buildBlirtsZip(params: {
           continue;
         }
         const blob = await res.blob();
-        const ext = mediaPath.includes('.') ? (mediaPath.split('.').pop() ?? 'bin') : t === 'video' ? 'mp4' : 'm4a';
-        const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext : t === 'video' ? 'mp4' : 'm4a';
-        folder?.file(`${t}-${b.id.slice(0, 8)}.${safeExt}`, blob);
+        const mediaTypeLabel =
+          t === 'soundtrack' ? (soundtrackKind === 'video' ? 'soundtrack-video' : 'soundtrack-audio') : t;
+        const ext = mediaPath.includes('.')
+          ? (mediaPath.split('.').pop() ?? 'bin')
+          : soundtrackKind === 'video' || t === 'video'
+            ? 'mp4'
+            : 'm4a';
+        const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext : soundtrackKind === 'video' || t === 'video' ? 'mp4' : 'm4a';
+        const fileStem = `${mediaTypeLabel}-${b.id.slice(0, 8)}`;
+        folder?.file(`${fileStem}.${safeExt}`, blob);
         const prompt = (b.prompt_snapshot ?? '').trim();
         const meta = [
-          `Type: ${t}`,
+          `Type: ${t}${t === 'soundtrack' ? ` (${soundtrackKind})` : ''}`,
           `Guest: ${b.guest_name?.trim() || '(not provided)'}`,
           `Created: ${b.created_at ?? ''}`,
           `Blirt id: ${b.id}`,
           prompt ? `Prompt: ${prompt}` : '',
+          t === 'soundtrack'
+            ? 'Note: This file is only the guest’s recorded message. The 30s song preview is not stored as a file.'
+            : '',
           '',
-          `Media file: ${t}-${b.id.slice(0, 8)}.${safeExt}`,
+          `Media file: ${fileStem}.${safeExt}`,
         ]
           .filter((line) => line !== '')
           .join('\n');
